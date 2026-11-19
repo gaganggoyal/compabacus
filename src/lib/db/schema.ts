@@ -37,6 +37,15 @@ export const registrations = sqliteTable(
     /** SHA-256 of the emailed "set a new PIN" token. Single use; cleared once used. */
     pinResetHash: text("pin_reset_hash"),
     pinResetExpires: integer("pin_reset_expires", { mode: "timestamp_ms" }),
+    /** Rupees, fixed when the registration was created (launch offer or regular). 0 when a school pays. */
+    feeAmount: integer("fee_amount").notNull().default(10),
+    /** Set when a school registered this student. Payment status then mirrors the school's payment. */
+    schoolId: text("school_id"),
+    /** School-registered students only: the PIN, encrypted, so the school can print login slips. */
+    pinEnc: text("pin_enc"),
+    /** Start of the booked one-hour exam slot. */
+    slotStart: integer("slot_start", { mode: "timestamp_ms" }),
+    slotBookedAt: integer("slot_booked_at", { mode: "timestamp_ms" }),
     consentAt: integer("consent_at", { mode: "timestamp_ms" }).notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
@@ -45,7 +54,36 @@ export const registrations = sqliteTable(
     index("reg_payment_idx").on(t.paymentStatus),
     index("reg_grade_idx").on(t.grade),
     index("reg_created_idx").on(t.createdAt),
+    index("reg_school_idx").on(t.schoolId),
+    index("reg_slot_idx").on(t.slotStart),
   ],
+);
+
+/** A school account: pays one fee and registers any number of its students. */
+export const schools = sqliteTable(
+  "schools",
+  {
+    id: text("id").primaryKey(),
+    code: text("code").notNull().unique(),
+    name: text("name").notNull(),
+    contactName: text("contact_name").notNull(),
+    phone: text("phone").notNull(),
+    email: text("email").notNull().unique(),
+    city: text("city").notNull(),
+    state: text("state").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    feeAmount: integer("fee_amount").notNull(),
+    paymentStatus: text("payment_status", { enum: PAYMENT_STATUSES }).notNull().default("unpaid"),
+    utr: text("utr").unique(),
+    paymentSubmittedAt: integer("payment_submitted_at", { mode: "timestamp_ms" }),
+    paymentVerifiedAt: integer("payment_verified_at", { mode: "timestamp_ms" }),
+    paymentNote: text("payment_note"),
+    failedLogins: integer("failed_logins").notNull().default(0),
+    lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
+    consentAt: integer("consent_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("school_payment_idx").on(t.paymentStatus), index("school_created_idx").on(t.createdAt)],
 );
 
 export const attempts = sqliteTable(
@@ -83,7 +121,19 @@ export const settings = sqliteTable("settings", {
   value: text("value").notNull(),
 });
 
-export const EMAIL_KINDS = ["registered", "payment_verified", "payment_rejected", "exam_submitted", "results", "pin_reset", "test"] as const;
+export const EMAIL_KINDS = [
+  "registered",
+  "payment_verified",
+  "payment_rejected",
+  "slot_booked",
+  "exam_submitted",
+  "results",
+  "pin_reset",
+  "school_registered",
+  "school_payment_verified",
+  "school_payment_rejected",
+  "test",
+] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 
 export const EMAIL_STATUSES = ["sent", "failed", "skipped"] as const;
@@ -95,6 +145,7 @@ export const emailLog = sqliteTable(
   {
     id: text("id").primaryKey(),
     registrationId: text("registration_id").references(() => registrations.id, { onDelete: "cascade" }),
+    schoolId: text("school_id"),
     kind: text("kind", { enum: EMAIL_KINDS }).notNull(),
     to: text("to_addr").notNull(),
     subject: text("subject").notNull(),
@@ -108,3 +159,4 @@ export const emailLog = sqliteTable(
 
 export type Registration = typeof registrations.$inferSelect;
 export type Attempt = typeof attempts.$inferSelect;
+export type School = typeof schools.$inferSelect;

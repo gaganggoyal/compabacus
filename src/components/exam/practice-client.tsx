@@ -3,6 +3,7 @@
 import { Check, Clock, RotateCcw, Timer, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useIndividualPrice } from "@/components/offer-countdown";
 import { btn, cn } from "@/components/ui";
 import { type Answers, type Paper, type Question, generatePaper, normaliseAnswer, scorePaper, toClientPaper } from "@/lib/exam/generator";
 import { GRADES, type Grade, type PaperSpec, STAGES, gradeById, quickVersion, totalQuestions } from "@/lib/exam/papers";
@@ -146,6 +147,7 @@ function questionText(q: Question) {
 }
 
 function PracticeResult({ done, onRetry, onChange }: { done: Done; onRetry: () => void; onChange: () => void }) {
+  const price = useIndividualPrice();
   const { score, max, bySection } = scorePaper(done.paper, done.answers);
   const pct = max ? Math.round((score / max) * 100) : 0;
   const message =
@@ -180,7 +182,7 @@ function PracticeResult({ done, onRetry, onChange }: { done: Done; onRetry: () =
             Change class
           </button>
           <Link href="/register" className={btn("light")}>
-            Register for the real exam · ₹10
+            Register for the real exam · {price}
           </Link>
         </div>
       </div>

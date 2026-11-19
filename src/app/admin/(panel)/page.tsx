@@ -1,11 +1,11 @@
-import { count, eq, sql } from "drizzle-orm";
+import { count, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { Download, TriangleExclamationPoint } from "lucide-react";
 import Link from "next/link";
 import { requestNow } from "@/lib/now";
 import { Suspense } from "react";
 import { Card, PageLoading } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
-import { examTestMode, fee, phaseAt, upiDetails } from "@/lib/config";
+import { examTestMode, phaseAt, upiDetails } from "@/lib/config";
 import { db, schema } from "@/lib/db";
 import { GRADES } from "@/lib/exam/papers";
 import { finalizeExpiredAttempts } from "@/lib/exam/server";
@@ -25,12 +25,15 @@ async function Overview() {
   const now = await requestNow();
   await finalizeExpiredAttempts(now);
 
+  // Payment counts are for parent registrations; school students share their school's payment.
   const pay = await db
     .select({ s: schema.registrations.paymentStatus, n: count() })
     .from(schema.registrations)
+    .where(isNull(schema.registrations.schoolId))
     .groupBy(schema.registrations.paymentStatus);
   const byPay = Object.fromEntries(pay.map((p) => [p.s, p.n])) as Record<string, number>;
-  const total = pay.reduce((a, p) => a + p.n, 0);
+  const [{ total }] = await db.select({ total: count() }).from(schema.registrations);
+  const [{ schoolStudents }] = await db.select({ schoolStudents: count() }).from(schema.registrations).where(isNotNull(schema.registrations.schoolId));
 
   const att = await db.select({ s: schema.attempts.status, n: count() }).from(schema.attempts).groupBy(schema.attempts.status);
   const byAtt = Object.fromEntries(att.map((p) => [p.s, p.n])) as Record<string, number>;
@@ -58,6 +61,20 @@ async function Overview() {
   const days = [...daily].reverse();
   const maxDay = Math.max(1, ...days.map((d) => d.n));
 
+  // Revenue = each verified registration's own fee (0 for school students) + verified school fees.
+  const [{ studentRevenue }] = await db
+    .select({ studentRevenue: sql<number>`coalesce(sum(${schema.registrations.feeAmount}), 0)` })
+    .from(schema.registrations)
+    .where(eq(schema.registrations.paymentStatus, "verified"));
+  const schoolPay = await db
+    .select({ s: schema.schools.paymentStatus, n: count(), fees: sql<number>`coalesce(sum(${schema.schools.feeAmount}), 0)` })
+    .from(schema.schools)
+    .groupBy(schema.schools.paymentStatus);
+  const schoolsTotal = schoolPay.reduce((a, p) => a + p.n, 0);
+  const schoolRevenue = schoolPay.find((p) => p.s === "verified")?.fees ?? 0;
+  const schoolsWaiting = schoolPay.find((p) => p.s === "submitted")?.n ?? 0;
+  const [{ slotted }] = await db.select({ slotted: count() }).from(schema.registrations).where(isNotNull(schema.registrations.slotStart));
+
   const mode = await getResultsMode();
   const warnings: string[] = [];
   if (upiDetails().vpa === "yourname@upi") warnings.push("UPI_ID is still the placeholder — set your real UPI ID in the environment.");
@@ -67,8 +84,10 @@ async function Overview() {
   const stats = [
     { k: total, v: "Registrations" },
     { k: byPay.verified ?? 0, v: "Payments verified" },
-    { k: inr((byPay.verified ?? 0) * fee.amount), v: "Verified revenue" },
-    { k: byPay.submitted ?? 0, v: "Awaiting verification", href: "/admin/payments" },
+    { k: inr(Number(studentRevenue) + Number(schoolRevenue)), v: "Verified revenue" },
+    { k: (byPay.submitted ?? 0) + schoolsWaiting, v: "Awaiting verification", href: "/admin/payments" },
+    { k: `${schoolsTotal} · ${schoolStudents}`, v: "Schools · their students", href: "/admin/schools" },
+    { k: slotted, v: "Slots booked", href: "/admin/slots" },
     { k: (byPay.unpaid ?? 0) + (byPay.rejected ?? 0), v: "Unpaid / rejected" },
     { k: byAtt.in_progress ?? 0, v: "Exams in progress" },
     { k: (byAtt.submitted ?? 0) + (byAtt.disqualified ?? 0), v: "Exams completed" },

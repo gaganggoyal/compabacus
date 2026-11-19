@@ -51,6 +51,15 @@ async function AdminResults() {
         <ResultsControls mode={mode} />
       </Card>
 
+      <Card className="p-6">
+        <p className="font-display text-lg font-bold">🎁 Surprise gift vouchers for toppers</p>
+        <p className="mt-1 text-sm text-ink/55">
+          The site promises a surprise gift voucher to the Champion (rank 1) of every class, up to 15 in all. Winners are told it comes to the
+          parent&apos;s registered email or mobile number (or through the school) and that we never ask for payment, OTP or bank details. In the
+          Results CSV the gift_voucher column marks them, next to the parent, phone, email and school code.
+        </p>
+      </Card>
+
       {GRADES.map((g) => {
         const inGrade = rows.filter((r) => r.grade === g.id);
         if (!inGrade.length) return null;

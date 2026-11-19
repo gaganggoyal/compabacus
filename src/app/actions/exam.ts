@@ -3,7 +3,6 @@
 import { and, eq } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { currentStudent } from "@/lib/auth";
-import { examTestMode, times } from "@/lib/config";
 import { newId, randomSeed } from "@/lib/crypto";
 import { db, schema } from "@/lib/db";
 import { generatePaper } from "@/lib/exam/generator";
@@ -16,23 +15,20 @@ import {
   parsePaper,
   sanitiseAnswers,
 } from "@/lib/exam/server";
+import { examGate, gateMessage } from "@/lib/student-view";
 
 export async function startExamAction(): Promise<{ error?: string }> {
   const reg = await currentStudent();
   if (!reg) return { error: "Please log in again." };
   const now = Date.now();
-  if (!examTestMode()) {
-    if (now < times.examStart) return { error: "The exam window has not opened yet." };
-    if (now > times.examEnd) return { error: "The exam window has closed." };
-  }
-  if (reg.paymentStatus !== "submitted" && reg.paymentStatus !== "verified") {
-    return { error: "Please complete the ₹10 payment before starting the exam." };
-  }
   const existing = await attemptFor(reg.id);
   if (existing) {
     refresh();
     return {};
   }
+  // Same rules as the dashboard: paid, slot booked, and only during that slot.
+  const gate = examGate(reg, undefined, now);
+  if (gate.kind !== "open") return { error: gateMessage(gate) };
   const grade = gradeById(reg.grade);
   if (!grade) return { error: "Unknown class. Please contact support." };
   const seed = randomSeed();

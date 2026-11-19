@@ -13,6 +13,8 @@ import { toClientPaper } from "@/lib/exam/generator";
 import { gradeById, totalQuestions } from "@/lib/exam/papers";
 import { parseAnswers, parsePaper } from "@/lib/exam/server";
 import { fmtDateTime, fmtDuration } from "@/lib/format";
+import { rupees } from "@/lib/pricing";
+import { slotLabel, slotTime } from "@/lib/slots";
 import { examGate, freshAttempt } from "@/lib/student-view";
 
 export const metadata: Metadata = { title: "Exam", robots: { index: false } };
@@ -103,12 +105,19 @@ async function ExamGate() {
   }
 
   if (gate.kind !== "open") {
+    const fee = rupees(reg.feeAmount);
     const msg =
       gate.kind === "pay"
-        ? { t: "Payment needed", d: "Complete the ₹10 payment to unlock your exam.", href: "/dashboard/payment", cta: "Pay ₹10" }
-        : gate.kind === "upcoming"
-          ? { t: "The exam isn't open yet", d: `It opens on ${fmtDateTime(times.examStart)}. Practise with free mock tests until then!`, href: "/practice", cta: "Free mock test" }
-          : { t: "The exam window has closed", d: "No attempt was recorded for this registration.", href: "/dashboard", cta: "Dashboard" };
+        ? reg.schoolId
+          ? { t: "Waiting for your school", d: "Your school's payment is pending. Your teacher will let you know.", href: "/dashboard", cta: "Dashboard" }
+          : { t: "Payment needed", d: `Complete the ${fee} payment to unlock your exam.`, href: "/dashboard/payment", cta: `Pay ${fee}` }
+        : gate.kind === "book"
+          ? { t: "Book your exam slot", d: "Pick a one-hour slot in December. The exam opens during that hour.", href: "/dashboard/slot", cta: "Book a slot" }
+          : gate.kind === "slot_upcoming"
+            ? { t: "Your slot hasn't started yet", d: `Your exam slot is ${slotLabel(gate.slot)}. Practise with free mock tests until then!`, href: "/practice", cta: "Free mock test" }
+            : gate.kind === "slot_missed"
+              ? { t: "Your slot has ended", d: "Book another open slot from your dashboard to take the exam.", href: "/dashboard/slot", cta: "Book another slot" }
+              : { t: "The exam window has closed", d: "No attempt was recorded for this registration.", href: "/dashboard", cta: "Dashboard" };
     return (
       <Shell>
         <Card className="p-8 text-center sm:p-12">
@@ -129,6 +138,9 @@ async function ExamGate() {
       <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight">Ready, {reg.studentName.split(" ")[0]}?</h1>
       <p className="mt-2 text-ink/60">
         {grade.label} paper · {grade.summary}
+      </p>
+      <p className="mt-4 inline-flex rounded-2xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100">
+        Your slot is open until {slotTime(gate.slot.end)} IST. Start before then.
       </p>
 
       <div className="mt-6 grid grid-cols-3 gap-3">

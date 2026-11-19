@@ -11,8 +11,9 @@ import { currentStudent } from "@/lib/auth";
 import { site, times } from "@/lib/config";
 import { gradeById, totalQuestions } from "@/lib/exam/papers";
 import { fmtDate, fmtDateTime } from "@/lib/format";
+import { slotAt, slotLabel } from "@/lib/slots";
 
-export const metadata: Metadata = { title: "Admit card" };
+export const metadata: Metadata = { title: "Admit card", robots: { index: false } };
 
 export default function AdmitCardPage() {
   return (
@@ -26,6 +27,7 @@ async function AdmitCard() {
   const reg = await currentStudent();
   if (!reg) redirect("/login?next=/dashboard/admit-card");
   const grade = gradeById(reg.grade);
+  const slot = slotAt(reg.slotStart);
   const qr = await QRCode.toDataURL(`${site.url}/login`, { margin: 1, width: 240 });
 
   return (
@@ -74,9 +76,18 @@ async function AdmitCard() {
             </div>
           </div>
           <div className="border-t border-dashed border-ink/15 px-8 py-6 text-sm">
-            <p className="font-display font-bold">Exam window</p>
+            <p className="font-display font-bold">Exam slot</p>
             <p className="mt-1 text-ink/70">
-              {fmtDateTime(times.examStart)} — {fmtDateTime(times.examEnd)} (IST). One attempt; once started, the timer cannot be paused.
+              {slot ? (
+                <>
+                  <b className="text-ink">{slotLabel(slot)}</b>. Start the exam any time during this hour. One attempt; once started, the timer cannot be
+                  paused.
+                </>
+              ) : (
+                <>
+                  Not booked yet: book a one-hour slot between {fmtDateTime(times.examStart)} and {fmtDateTime(times.examEnd)} (IST) from your dashboard.
+                </>
+              )}
             </p>
             <p className="mt-4 font-display font-bold">Instructions</p>
             <ol className="mt-1 list-decimal space-y-1 pl-5 text-ink/70">

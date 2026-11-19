@@ -10,14 +10,18 @@ import {
   computeResultsAction,
   disqualifyAttemptAction,
   markPaidManuallyAction,
+  markSchoolPaidAction,
   rejectPaymentAction,
+  rejectSchoolPaymentAction,
   resetAttemptAction,
   resetPinAction,
+  resetSchoolPasswordAction,
   restoreAttemptAction,
   sendResultEmailsAction,
   sendTestEmailAction,
   setResultsModeAction,
   verifyPaymentAction,
+  verifySchoolPaymentAction,
 } from "@/app/actions/admin";
 import { btn, cn, inputCls } from "@/components/ui";
 import type { ResultsMode } from "@/lib/settings";
@@ -77,6 +81,71 @@ export function PaymentActions({ id, status }: { id: string; status: string }) {
         </button>
       )}
     </div>
+  );
+}
+
+export function SchoolPaymentActions({ id, status }: { id: string; status: string }) {
+  const [pending, start] = useTransition();
+  return (
+    <div className="flex flex-wrap justify-end gap-1.5">
+      {status === "submitted" && (
+        <>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => start(() => verifySchoolPaymentAction(id))}
+            className={cn(small, "bg-emerald-600 text-white hover:bg-emerald-500")}
+          >
+            <Check className="h-3.5 w-3.5" /> Verify
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              const note = window.prompt("Reason shown to the school (optional):", "We could not find this UPI reference in our account. Please check and re-submit.");
+              if (note !== null) start(() => rejectSchoolPaymentAction(id, note));
+            }}
+            className={cn(small, "bg-rose-50 text-rose-700 hover:bg-rose-100")}
+          >
+            <X className="h-3.5 w-3.5" /> Reject
+          </button>
+        </>
+      )}
+      {(status === "unpaid" || status === "rejected") && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            if (window.confirm("Mark this school as paid (e.g. bank transfer received)?")) start(() => markSchoolPaidAction(id));
+          }}
+          className={cn(small, "bg-ink/5 text-ink hover:bg-ink/10")}
+        >
+          Mark paid
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function ResetSchoolPasswordButton({ id, name }: { id: string; name: string }) {
+  const [pending, start] = useTransition();
+  const [pw, setPw] = useState<string | null>(null);
+  return pw ? (
+    <span className="rounded-full bg-amber-100 px-3 py-1 font-mono text-xs font-bold text-amber-900" title="Share this with the school; they can keep using it">
+      New password {pw}
+    </span>
+  ) : (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => {
+        if (!window.confirm(`Give ${name} a new password? The old one stops working.`)) return;
+        start(async () => setPw((await resetSchoolPasswordAction(id)).password));
+      }}
+      className={cn(small, "bg-ink/5 text-ink hover:bg-ink/10")}
+    >
+      <KeyRound className="h-3.5 w-3.5" /> New password
+    </button>
   );
 }
 

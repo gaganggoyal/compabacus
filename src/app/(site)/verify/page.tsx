@@ -8,7 +8,11 @@ import { gradeLabel } from "@/lib/exam/papers";
 import { AWARD_META } from "@/lib/format";
 import { certificateByNo, resultsLive } from "@/lib/results";
 
-export const metadata: Metadata = { title: "Verify a certificate" };
+export const metadata: Metadata = {
+  title: "Verify a certificate",
+  description: "Check that a Kudos Cup certificate is genuine by its certificate number or QR code.",
+  alternates: { canonical: "/verify" },
+};
 
 export default function VerifyPage({ searchParams }: PageProps<"/verify">) {
   return (

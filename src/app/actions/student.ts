@@ -5,15 +5,21 @@ import { and, count, eq, gt, ne } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { INDIAN_STATES, MAX_AGE, MIN_AGE, ageOn, examTestMode, site, times } from "@/lib/config";
-import { hashSecret, newId, randomDigits, verifySecret } from "@/lib/crypto";
+import { INDIAN_STATES, examTestMode, site, times } from "@/lib/config";
+import { encryptPin, hashSecret, newId, randomDigits, verifySecret } from "@/lib/crypto";
 import { db, schema } from "@/lib/db";
-import { notifyRegistrations, sendPinReset } from "@/lib/email/notify";
+import { notifyRegistrations, notifySlotBooked, sendPinReset } from "@/lib/email/notify";
 import { EMAIL_RE } from "@/lib/email/send";
 import { gradeById, gradeLabel } from "@/lib/exam/papers";
+import { attemptFor } from "@/lib/exam/server";
 import { maskName } from "@/lib/format";
 import { requireStudent } from "@/lib/auth";
+import { chargeFor } from "@/lib/pricing";
 import { clearStudentSession, setStudentSession } from "@/lib/session";
+import { slotById } from "@/lib/slots";
+import { bookSlot } from "@/lib/slots-server";
+import { canBookSlot } from "@/lib/student-view";
+import { eligibilityError, normalisePhone } from "@/lib/validation";
 
 export type FormState = {
   ok?: boolean;
@@ -27,13 +33,6 @@ const text = (min: number, max: number, label: string) =>
     .trim()
     .min(min, `${label} is required`)
     .max(max, `${label} is too long`);
-
-function normalisePhone(raw: string) {
-  const digits = raw.replace(/[^\d+]/g, "");
-  if (/^(\+?91)?[6-9]\d{9}$/.test(digits)) return digits.slice(-10);
-  if (/^\+\d{8,15}$/.test(digits)) return digits;
-  return null;
-}
 
 const registerSchema = z
   .object({
@@ -66,23 +65,8 @@ const registerSchema = z
   })
   .refine((d) => d.pin === d.pinConfirm, { path: ["pinConfirm"], message: "PINs do not match" })
   .superRefine((d, ctx) => {
-    const age = ageOn(d.dob);
-    if (Number.isNaN(age) || age < MIN_AGE || age > MAX_AGE) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["dob"],
-        message: `Students must be ${MIN_AGE}–${MAX_AGE} years old on 1 Dec 2026 (this date gives ${Number.isNaN(age) ? "?" : age})`,
-      });
-      return;
-    }
-    const grade = gradeById(d.grade);
-    if (grade && (age < grade.ages[0] || age > grade.ages[1])) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["grade"],
-        message: `${grade.label} is for children aged ${grade.ages[0]}–${grade.ages[1]} on 1 Dec 2026, but this date of birth gives ${age}. Please check the class or date of birth.`,
-      });
-    }
+    const problem = eligibilityError(d.dob, d.grade);
+    if (problem) ctx.addIssue({ code: "custom", path: [problem.field], message: problem.message });
   });
 
 function issuesToErrors(issues: z.core.$ZodIssue[]) {
@@ -150,6 +134,7 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
     state: d.state,
     country: d.state === "Outside India" ? d.country?.trim() || "Other" : "India",
     pinHash: await hashSecret(d.pin),
+    feeAmount: chargeFor("individual", now.getTime()),
     consentAt: now,
     createdAt: now,
   });
@@ -265,7 +250,15 @@ export async function resetPinWithTokenAction(_prev: FormState, formData: FormDa
 
   const res = await db
     .update(schema.registrations)
-    .set({ pinHash: await hashSecret(pin), pinResetHash: null, pinResetExpires: null, failedLogins: 0, lockedUntil: null })
+    .set({
+      pinHash: await hashSecret(pin),
+      // Keep the school's printable copy in step with the new PIN.
+      pinEnc: reg.schoolId ? encryptPin(pin) : null,
+      pinResetHash: null,
+      pinResetExpires: null,
+      failedLogins: 0,
+      lockedUntil: null,
+    })
     .where(and(eq(schema.registrations.id, reg.id), eq(schema.registrations.pinResetHash, hash)));
   if (!res.rowsAffected) return expired;
 
@@ -287,6 +280,7 @@ export async function lookupByPhoneAction(_prev: LookupState, formData: FormData
 
 export async function submitUtrAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const reg = await requireStudent();
+  if (reg.schoolId) return { message: "Your school pays for your registration, so there is nothing to pay here." };
   if (reg.paymentStatus === "verified") return { ok: true, message: "Your payment is already verified." };
   const utr = String(formData.get("utr") ?? "")
     .trim()
@@ -295,12 +289,14 @@ export async function submitUtrAction(_prev: FormState, formData: FormData): Pro
   if (!/^[A-Z0-9]{10,22}$/.test(utr)) {
     return { errors: { utr: "Enter the 12-digit UPI reference / UTR number from your payment app" } };
   }
-  const used = await db.query.registrations.findFirst({
-    where: and(eq(schema.registrations.utr, utr), ne(schema.registrations.id, reg.id)),
-  });
+  const used =
+    (await db.query.registrations.findFirst({
+      where: and(eq(schema.registrations.utr, utr), ne(schema.registrations.id, reg.id)),
+      columns: { id: true },
+    })) ?? (await db.query.schools.findFirst({ where: eq(schema.schools.utr, utr), columns: { id: true } }));
   if (used) {
     return {
-      errors: { utr: "This transaction ID is already linked to another registration. Each child needs a separate ₹10 payment." },
+      errors: { utr: "This transaction ID is already linked to another registration. Each child needs a separate payment." },
     };
   }
   await db
@@ -308,5 +304,28 @@ export async function submitUtrAction(_prev: FormState, formData: FormData): Pro
     .set({ utr, paymentStatus: "submitted", paymentSubmittedAt: new Date(), paymentNote: null })
     .where(eq(schema.registrations.id, reg.id));
   refresh();
-  return { ok: true, message: "Thanks! Your payment is submitted for verification." };
+  return { ok: true, message: "Thanks! Your payment is submitted for verification. Next, book your exam slot." };
+}
+
+/** Books or moves the logged-in student's one-hour exam slot. */
+export async function bookSlotAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const reg = await requireStudent();
+  const slot = slotById(String(formData.get("slot") ?? ""));
+  if (!slot) return { message: "Please pick a slot." };
+  const now = Date.now();
+  const attempt = await attemptFor(reg.id);
+  if (!canBookSlot(reg, attempt, now)) {
+    return {
+      message: attempt
+        ? "Your exam has already started, so the slot can't be changed."
+        : reg.paymentStatus === "unpaid" || reg.paymentStatus === "rejected"
+          ? "Please complete the payment first, then book your slot."
+          : "Slot booking is closed.",
+    };
+  }
+  if (reg.slotStart?.getTime() === slot.start) return { ok: true, message: "This slot is already yours." };
+  const res = await bookSlot(reg.id, slot, now);
+  if ("error" in res) return { message: res.error };
+  notifySlotBooked(reg.id);
+  redirect("/dashboard?booked=1");
 }

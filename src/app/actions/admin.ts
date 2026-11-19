@@ -4,9 +4,10 @@ import { and, eq, inArray, ne } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { assertAdmin } from "@/lib/auth";
-import { hashSecret, randomDigits, safeEqual } from "@/lib/crypto";
+import { encryptPin, hashSecret, randomCode, randomDigits, safeEqual } from "@/lib/crypto";
 import { db, schema } from "@/lib/db";
-import { notifyRegistrations, pendingResultEmails, sendResultEmails } from "@/lib/email/notify";
+import { notifyRegistrations, notifySchool, pendingResultEmails, sendResultEmails } from "@/lib/email/notify";
+import { syncSchoolStudents } from "@/lib/schools";
 import { EMAIL_RE, deliver, emailSettings } from "@/lib/email/send";
 import { testEmail } from "@/lib/email/templates";
 import { computeResults, resultsLive } from "@/lib/results";
@@ -72,7 +73,7 @@ export async function markPaidManuallyAction(registrationId: string) {
 
 export type BulkState = { matched?: number; unmatched?: string[]; message?: string };
 
-/** Paste UTRs (or a whole bank statement) — every 10-22 char token that matches a pending UTR is verified. */
+/** Paste UTRs (or a whole bank statement) — every 10-22 char token that matches a pending UTR is verified (students and schools). */
 export async function bulkVerifyAction(_prev: BulkState, formData: FormData): Promise<BulkState> {
   await assertAdmin();
   const raw = String(formData.get("utrs") ?? "").toUpperCase();
@@ -94,10 +95,15 @@ export async function bulkVerifyAction(_prev: BulkState, formData: FormData): Pr
       );
     notifyRegistrations("payment_verified", pending.map((p) => p.id));
   }
-  const matched = new Set(pending.map((p) => p.utr));
+  const pendingSchools = await db
+    .select({ id: schema.schools.id, utr: schema.schools.utr })
+    .from(schema.schools)
+    .where(and(eq(schema.schools.paymentStatus, "submitted"), inArray(schema.schools.utr, tokens)));
+  for (const s of pendingSchools) await setSchoolPayment(s.id, "verified");
+  const matched = new Set([...pending, ...pendingSchools].map((p) => p.utr));
   refresh();
   return {
-    matched: pending.length,
+    matched: matched.size,
     unmatched: tokens.filter((t) => !matched.has(t) && /^\d{12}$/.test(t)).slice(0, 50),
   };
 }
@@ -105,11 +111,63 @@ export async function bulkVerifyAction(_prev: BulkState, formData: FormData): Pr
 export async function resetPinAction(registrationId: string) {
   await assertAdmin();
   const pin = randomDigits(6);
+  const reg = await db.query.registrations.findFirst({ where: eq(schema.registrations.id, registrationId), columns: { schoolId: true } });
   await db
     .update(schema.registrations)
-    .set({ pinHash: await hashSecret(pin), failedLogins: 0, lockedUntil: null })
+    .set({ pinHash: await hashSecret(pin), pinEnc: reg?.schoolId ? encryptPin(pin) : null, failedLogins: 0, lockedUntil: null })
     .where(eq(schema.registrations.id, registrationId));
   return { pin };
+}
+
+/** Changes a school's payment status, mirrors it onto its students and emails the school. */
+async function setSchoolPayment(schoolId: string, status: "verified" | "rejected", note?: string) {
+  const changed = await db
+    .update(schema.schools)
+    .set(
+      status === "verified"
+        ? { paymentStatus: "verified", paymentVerifiedAt: new Date(), paymentNote: note ?? null }
+        : {
+            paymentStatus: "rejected",
+            paymentVerifiedAt: null,
+            utr: null,
+            paymentNote: note?.trim().slice(0, 200) || "We could not find this transaction. Please check the UTR and re-submit.",
+          },
+    )
+    .where(and(eq(schema.schools.id, schoolId), ne(schema.schools.paymentStatus, status)))
+    .returning({ id: schema.schools.id });
+  if (!changed.length) return;
+  await syncSchoolStudents(schoolId, status);
+  notifySchool(status === "verified" ? "school_payment_verified" : "school_payment_rejected", schoolId);
+}
+
+export async function verifySchoolPaymentAction(schoolId: string) {
+  await assertAdmin();
+  await setSchoolPayment(schoolId, "verified");
+  refresh();
+}
+
+export async function rejectSchoolPaymentAction(schoolId: string, note: string) {
+  await assertAdmin();
+  await setSchoolPayment(schoolId, "rejected", note);
+  refresh();
+}
+
+/** Mark a school as paid without a UTR, e.g. a bank transfer or cheque. */
+export async function markSchoolPaidAction(schoolId: string) {
+  await assertAdmin();
+  await setSchoolPayment(schoolId, "verified", "Marked paid by admin");
+  refresh();
+}
+
+/** Gives a school a new temporary password (shown once to the organiser). */
+export async function resetSchoolPasswordAction(schoolId: string) {
+  await assertAdmin();
+  const password = `${randomCode(4)}-${randomCode(4)}`;
+  await db
+    .update(schema.schools)
+    .set({ passwordHash: await hashSecret(password), failedLogins: 0, lockedUntil: null })
+    .where(eq(schema.schools.id, schoolId));
+  return { password };
 }
 
 export async function disqualifyAttemptAction(attemptId: string, reason: string) {

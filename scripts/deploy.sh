@@ -26,9 +26,10 @@ APP=/var/www/kudoscup
 chown -R kudoscup:kudoscup "$APP"
 cd "$APP"
 sudo -u kudoscup -H npm ci --no-audit --no-fund --loglevel=error
-sudo -u kudoscup -H npm run build
-# Adds new tables/columns. It refuses (and stops the deploy) if a change would lose data.
+# Schema first: the build prerenders pages that read the database, so new tables/columns must exist before it.
+# drizzle-kit push only adds here; it refuses (and stops the deploy) if a change would lose data.
 sudo -u kudoscup -H bash -c 'set -a; . ./.env.production.local; set +a; npx drizzle-kit push'
+sudo -u kudoscup -H npm run build
 mkdir -p "$APP/.next/cache" && chown -R kudoscup:kudoscup "$APP/.next"
 systemctl reset-failed kudoscup 2>/dev/null || true
 systemctl restart kudoscup

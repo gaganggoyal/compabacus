@@ -8,9 +8,10 @@ import { CopyButton } from "@/components/copy-button";
 import { UtrForm } from "@/components/forms/utr-form";
 import { Badge, Card, PageLoading, btn, cn } from "@/components/ui";
 import { currentStudent } from "@/lib/auth";
-import { fee, site, upiDetails } from "@/lib/config";
+import { site, upiDetails } from "@/lib/config";
+import { rupees } from "@/lib/pricing";
 
-export const metadata: Metadata = { title: "Pay ₹10" };
+export const metadata: Metadata = { title: "Payment", robots: { index: false } };
 
 export default function PaymentPage({ searchParams }: PageProps<"/dashboard/payment">) {
   return (
@@ -23,10 +24,12 @@ export default function PaymentPage({ searchParams }: PageProps<"/dashboard/paym
 async function Payment({ searchParams }: { searchParams: PageProps<"/dashboard/payment">["searchParams"] }) {
   const reg = await currentStudent();
   if (!reg) redirect("/login?next=/dashboard/payment");
+  if (reg.schoolId) redirect("/dashboard");
+  const amount = reg.feeAmount;
   const { welcome } = await searchParams;
   const { vpa, payee, ready } = upiDetails();
   // Keep "@" unescaped in the UPI ID: some bank UPI apps reject "%40".
-  const upiUrl = `upi://pay?pa=${encodeURIComponent(vpa).replace(/%40/g, "@")}&pn=${encodeURIComponent(payee)}&am=${fee.amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(
+  const upiUrl = `upi://pay?pa=${encodeURIComponent(vpa).replace(/%40/g, "@")}&pn=${encodeURIComponent(payee)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(
     `${site.shortName} ${reg.regNo}`,
   )}`;
   const qrSvg = ready
@@ -55,8 +58,8 @@ async function Payment({ searchParams }: { searchParams: PageProps<"/dashboard/p
       )}
 
       <div className="mt-8">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Step 2 of 2</p>
-        <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight">Pay ₹{fee.amount} by UPI</h1>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Step 2 of 3</p>
+        <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight">Pay {rupees(amount)} by UPI</h1>
       </div>
 
       {reg.paymentStatus === "verified" ? (
@@ -64,15 +67,15 @@ async function Payment({ searchParams }: { searchParams: PageProps<"/dashboard/p
           <BadgeCheck className="mx-auto h-12 w-12 text-emerald-600" />
           <p className="mt-4 font-display text-2xl font-bold">Payment verified</p>
           <p className="mt-2 text-ink/60">Thank you! {reg.studentName} is confirmed for the championship.</p>
-          <Link href="/dashboard" className={cn(btn("primary"), "mt-6")}>
-            Go to dashboard
+          <Link href={reg.slotStart ? "/dashboard" : "/dashboard/slot"} className={cn(btn("primary"), "mt-6")}>
+            {reg.slotStart ? "Go to dashboard" : "Book your exam slot"}
           </Link>
         </Card>
       ) : !ready ? (
         <Card className="mt-8 max-w-xl p-8">
           <p className="font-display text-2xl font-bold">Payments open soon</p>
           <p className="mt-2 text-ink/65">
-            Your registration is saved. The ₹{fee.amount} UPI payment opens shortly. Please come back to this page, or log in later with{" "}
+            Your registration is saved. The {rupees(amount)} UPI payment opens shortly. Please come back to this page, or log in later with{" "}
             <b className="font-mono">{reg.regNo}</b> and your PIN.
           </p>
         </Card>
@@ -81,7 +84,7 @@ async function Payment({ searchParams }: { searchParams: PageProps<"/dashboard/p
           <Card className="p-6 sm:p-8">
             <div className="flex items-center justify-between">
               <p className="font-display text-lg font-bold">1. Scan & pay</p>
-              <Badge tone="amber">Amount ₹{fee.amount}.00</Badge>
+              <Badge tone="amber">Amount {rupees(amount)}.00</Badge>
             </div>
             <div className="mx-auto mt-6 w-full max-w-[16rem] rounded-3xl bg-white p-3 ring-1 ring-ink/10">
               <div className="[&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
@@ -98,7 +101,7 @@ async function Payment({ searchParams }: { searchParams: PageProps<"/dashboard/p
               <Smartphone className="h-4 w-4" /> Open UPI app to pay
             </a>
             <ul className="mt-5 space-y-1.5 text-xs text-ink/55">
-              <li>• Pay exactly ₹{fee.amount}. One payment per child.</li>
+              <li>• Pay exactly {rupees(amount)}. One payment per child.</li>
               <li>• Paying on this phone? Take a screenshot of the QR and upload it in your UPI app via &ldquo;Scan from gallery&rdquo;.</li>
               <li>• Payee name shown in your app: {payee}</li>
             </ul>
@@ -110,7 +113,11 @@ async function Payment({ searchParams }: { searchParams: PageProps<"/dashboard/p
             </p>
             {reg.paymentStatus === "submitted" && (
               <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Submitted — we&apos;re verifying it. You can already take the exam. Entered the wrong number? Update it below.
+                Submitted, we&apos;re verifying it. You can already book your exam slot.{" "}
+                <Link href="/dashboard/slot" className="font-bold underline">
+                  Book a slot →
+                </Link>{" "}
+                Entered the wrong number? Update it below.
               </p>
             )}
             {reg.paymentStatus === "rejected" && (

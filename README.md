@@ -1,10 +1,22 @@
 # Kudos Cup Abacus Championship 2026
 
-An online abacus competition site for children from Nursery to Class 12 (ages 4–18). Registration costs ₹10, paid by UPI QR. The exam window is open from 1 to 31 December 2026, and winners are announced automatically at midnight IST on 1 January 2027.
+An online abacus competition site for children from Nursery to Class 12 (ages 4–18). Registration costs ₹499 per child, with a launch offer of ₹10 until 25 December 2026; schools pay ₹9,999 (launch offer ₹999) for unlimited students. Payment is by UPI QR. Students book a one-hour exam slot between 1 and 31 December 2026, and winners are announced automatically at midnight IST on 1 January 2027.
 
 Kudos Cup is the brand for this and future championships, founded by Gagan (Founder) and Vansh (Co-founder). This championship runs at https://kudoscup.com.
 
 ## Features
+
+**Pricing, slots and schools**
+- Prices live in `pricing` in `src/lib/config.ts`: regular ₹499 / school ₹9,999, launch offer ₹10 / ₹999 until `offerEndsAt` (25 Dec 2026, 11:59 PM IST).
+  - The offer is real: afterwards, new sign-ups pay the regular price. Every registration and school stores the fee it signed up with (`fee_amount`), so the price shown at sign-up is the price they pay, even if they pay later.
+  - Pages show the strikethrough price and a countdown, and switch to the regular price by themselves within about 5 minutes of the deadline (cached with `cacheLife`, no redeploy needed).
+- Exam slots (`src/lib/slots.ts`): 156 one-hour slots across December (school-day evenings, more at weekends and on 25 Dec), 100 seats each (`slotRules`).
+  - Seat counts are real bookings. "Filling fast" shows only when a slot is 70% booked; full slots can't be picked. Booking is atomic, so a slot never overfills.
+  - Students book after paying. The exam can only be started during the booked hour; a student who misses it books another open slot.
+  - Public schedule at `/schedule` and on the home page.
+- School accounts (`/schools`): one fee for any number of students.
+  - The school adds students one by one or by pasting a class list (Name, DOB, Class), prints login slips with PINs, downloads a CSV, books one slot for a whole class, and sees every result.
+  - School students pay nothing themselves: their payment status mirrors the school's. Their PINs are stored encrypted (AES-GCM, key from `SESSION_SECRET`) so the school can reprint slips; logins still check the scrypt hash.
 
 **For parents and students**
 - Landing page with a live countdown, the exam format, categories, awards, key dates and FAQ.
@@ -97,6 +109,13 @@ The live site runs on the VPS at 161.97.97.34, next to the other apps there.
 **To deploy an update:** run `./scripts/deploy.sh` from this folder. It uploads the code, then on the server installs packages, builds, adds any new database tables or columns, restarts the service and checks it came up. It refuses to apply a database change that would lose data.
 
 **Future championships:** give each one its own subdomain (for example `maths.kudoscup.com`), deployment and database. Keep this one at kudoscup.com, because its certificate QR codes point there.
+
+### SEO and the sitemap
+
+- One sitemap serves phones and computers: **https://kudoscup.com/sitemap.xml**. The site is responsive (same URLs and content on every device), so Google's mobile-first crawler uses the same list.
+- To submit it: in [Google Search Console](https://search.google.com/search-console), add a **Domain** property for `kudoscup.com`, add the TXT record it shows at Nameslink, verify, then open **Sitemaps** and submit `sitemap.xml`. In [Bing Webmaster Tools](https://www.bing.com/webmasters), import the site from Search Console.
+- Optional: to verify with an HTML tag instead of DNS, set `GOOGLE_SITE_VERIFICATION` (and `BING_SITE_VERIFICATION`) in `.env.production.local` and redeploy.
+- Every public page has a title, description and canonical URL. The home page carries `EducationEvent` (with both offers), `FAQPage`, `Organization` and `WebSite` structured data. Private pages are `noindex` or blocked in `robots.txt`.
 
 ### Emails
 

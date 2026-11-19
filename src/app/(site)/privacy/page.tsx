@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ProsePage } from "@/components/prose-page";
 import { site } from "@/lib/config";
 
-export const metadata: Metadata = { title: "Privacy policy" };
+export const metadata: Metadata = { title: "Privacy policy", alternates: { canonical: "/privacy" } };
 
 export default function PrivacyPage() {
   return (
@@ -14,6 +14,10 @@ export default function PrivacyPage() {
       <h2>What we collect</h2>
       <ul>
         <li>Student: name, date of birth, optional gender, optional school/academy, and school class.</li>
+        <li>
+          School registrations: the school&apos;s name, city and contact person&apos;s details. A school that registers students provides their details,
+          confirms the parent&apos;s or guardian&apos;s consent, and can see its own students&apos; logins, exam slots and results.
+        </li>
         <li>Parent/guardian: name, mobile number, email, city and state.</li>
         <li>Payment: the UPI transaction reference you enter. We never see or store card, bank or UPI PIN details.</li>
         <li>Exam: answers, timing, and how often the exam screen was left.</li>
@@ -22,6 +26,7 @@ export default function PrivacyPage() {
       <ul>
         <li>To register the student, verify payment, place them in the right category, conduct the exam and publish results.</li>
         <li>To issue certificates and let anyone verify them.</li>
+        <li>To send each class topper their gift voucher, using the email or mobile number given at registration (or through the school).</li>
         <li>
           To email the parent about this competition: the registration number, payment confirmation, exam confirmation, results and PIN resets. We
           do not send marketing without separate permission.

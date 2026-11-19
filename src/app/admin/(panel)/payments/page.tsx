@@ -1,9 +1,10 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { Suspense } from "react";
-import { BulkVerifyForm, PaymentActions } from "@/components/admin/admin-forms";
+import { BulkVerifyForm, PaymentActions, SchoolPaymentActions } from "@/components/admin/admin-forms";
 import { Card, PageLoading } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
-import { fee, upiDetails } from "@/lib/config";
+import { upiDetails } from "@/lib/config";
+import { rupees } from "@/lib/pricing";
 import { db, schema } from "@/lib/db";
 import { fmtDateTime } from "@/lib/format";
 
@@ -20,22 +21,29 @@ async function Payments() {
   const pending = await db
     .select()
     .from(schema.registrations)
-    .where(eq(schema.registrations.paymentStatus, "submitted"))
+    .where(and(eq(schema.registrations.paymentStatus, "submitted"), isNull(schema.registrations.schoolId)))
     .orderBy(asc(schema.registrations.paymentSubmittedAt))
     .limit(500);
   const rejected = await db
     .select()
     .from(schema.registrations)
-    .where(eq(schema.registrations.paymentStatus, "rejected"))
+    .where(and(eq(schema.registrations.paymentStatus, "rejected"), isNull(schema.registrations.schoolId)))
     .orderBy(desc(schema.registrations.createdAt))
     .limit(100);
+  const schools = await db
+    .select()
+    .from(schema.schools)
+    .where(eq(schema.schools.paymentStatus, "submitted"))
+    .orderBy(asc(schema.schools.paymentSubmittedAt))
+    .limit(200);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-bold">Payments</h1>
         <p className="mt-1 text-sm text-ink/55">
-          Check each UTR against the credits of ₹{fee.amount} to <b>{upiDetails().vpa}</b> in your bank or UPI business app.
+          Check each UTR against the credits to <b>{upiDetails().vpa}</b> in your bank or UPI business app. The expected amount is shown on each row (launch
+          offer or regular price, fixed when they registered).
         </p>
       </div>
 
@@ -57,6 +65,7 @@ async function Payments() {
           <thead className="text-xs uppercase tracking-wider text-ink/45">
             <tr>
               <th className="px-4 py-3">UTR</th>
+              <th className="px-4 py-3">Amount</th>
               <th className="px-4 py-3">Student</th>
               <th className="px-4 py-3">Phone</th>
               <th className="px-4 py-3">Submitted</th>
@@ -67,6 +76,7 @@ async function Payments() {
             {pending.map((r) => (
               <tr key={r.id}>
                 <td className="px-4 py-3 font-mono font-semibold">{r.utr}</td>
+                <td className="px-4 py-3 font-semibold">{rupees(r.feeAmount)}</td>
                 <td className="px-4 py-3">
                   <p className="font-semibold">{r.studentName}</p>
                   <p className="font-mono text-xs text-ink/50">{r.regNo}</p>
@@ -80,7 +90,7 @@ async function Payments() {
             ))}
             {!pending.length && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-ink/45">
+                <td colSpan={6} className="px-4 py-10 text-center text-ink/45">
                   All caught up — nothing to verify. 🎉
                 </td>
               </tr>
@@ -88,6 +98,34 @@ async function Payments() {
           </tbody>
         </table>
       </div>
+
+      {schools.length > 0 && (
+        <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-ink/8">
+          <div className="flex items-center justify-between border-b border-ink/8 px-4 py-3">
+            <p className="font-display font-bold">Schools awaiting verification</p>
+            <span className="text-sm text-ink/55">{schools.length}</span>
+          </div>
+          <table className="w-full min-w-[44rem] text-left text-sm">
+            <tbody className="divide-y divide-ink/6">
+              {schools.map((s) => (
+                <tr key={s.id}>
+                  <td className="px-4 py-3 font-mono font-semibold">{s.utr}</td>
+                  <td className="px-4 py-3 font-semibold">{rupees(s.feeAmount)}</td>
+                  <td className="px-4 py-3">
+                    <p className="font-semibold">{s.name}</p>
+                    <p className="font-mono text-xs text-ink/50">{s.code}</p>
+                  </td>
+                  <td className="px-4 py-3 text-xs">{s.phone}</td>
+                  <td className="px-4 py-3 text-xs text-ink/55">{s.paymentSubmittedAt ? fmtDateTime(s.paymentSubmittedAt) : "—"}</td>
+                  <td className="px-4 py-3">
+                    <SchoolPaymentActions id={s.id} status={s.paymentStatus} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {rejected.length > 0 && (
         <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-ink/8">

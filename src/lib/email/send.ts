@@ -85,9 +85,13 @@ async function log(rows: LogRow[]) {
   }
 }
 
-function logRow(kind: EmailKind, msg: EmailMessage, registrationId: string | null, status: EmailStatus, extra: Partial<LogRow> = {}): LogRow {
-  return { id: newId(), registrationId, kind, to: msg.to, subject: msg.subject, status, createdAt: new Date(), ...extra };
+type Owner = { registrationId: string | null; schoolId: string | null };
+
+function logRow(kind: EmailKind, msg: EmailMessage, owner: Owner, status: EmailStatus, extra: Partial<LogRow> = {}): LogRow {
+  return { id: newId(), ...owner, kind, to: msg.to, subject: msg.subject, status, createdAt: new Date(), ...extra };
 }
+
+const forReg = (registrationId: string): Owner => ({ registrationId, schoolId: null });
 
 function payload(kind: EmailKind, msg: EmailMessage) {
   const cfg = emailSettings();
@@ -100,25 +104,29 @@ function skippedNotice(kind: EmailKind, msg: EmailMessage) {
 }
 
 /** Sends one email and records the outcome. Never throws: a failed email must never break registration or payments. */
-export async function deliver(kind: EmailKind, msg: EmailMessage, opts: { registrationId?: string | null; idempotencyKey?: string } = {}) {
-  const regId = opts.registrationId ?? null;
+export async function deliver(
+  kind: EmailKind,
+  msg: EmailMessage,
+  opts: { registrationId?: string | null; schoolId?: string | null; idempotencyKey?: string } = {},
+) {
+  const owner: Owner = { registrationId: opts.registrationId ?? null, schoolId: opts.schoolId ?? null };
   if (!EMAIL_RE.test(msg.to)) {
-    await log([logRow(kind, msg, regId, "failed", { error: "Invalid email address" })]);
+    await log([logRow(kind, msg, owner, "failed", { error: "Invalid email address" })]);
     return false;
   }
   if (!emailSettings().enabled) {
     skippedNotice(kind, msg);
-    await log([logRow(kind, msg, regId, "skipped")]);
+    await log([logRow(kind, msg, owner, "skipped")]);
     return false;
   }
   try {
     const r = (await resend("/emails", payload(kind, msg), opts.idempotencyKey)) as { id?: string };
-    await log([logRow(kind, msg, regId, "sent", { providerId: r.id ?? null })]);
+    await log([logRow(kind, msg, owner, "sent", { providerId: r.id ?? null })]);
     return true;
   } catch (e) {
     const error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
     console.error(`[email] ${kind} failed -> ${msg.to}: ${error}`);
-    await log([logRow(kind, msg, regId, "failed", { error })]);
+    await log([logRow(kind, msg, owner, "failed", { error })]);
     return false;
   }
 }
@@ -127,10 +135,10 @@ export async function deliver(kind: EmailKind, msg: EmailMessage, opts: { regist
 export async function deliverBatch(kind: EmailKind, items: { msg: EmailMessage; registrationId: string }[]) {
   const invalid = items.filter((i) => !EMAIL_RE.test(i.msg.to));
   const valid = items.filter((i) => EMAIL_RE.test(i.msg.to));
-  await log(invalid.map((i) => logRow(kind, i.msg, i.registrationId, "failed", { error: "Invalid email address" })));
+  await log(invalid.map((i) => logRow(kind, i.msg, forReg(i.registrationId), "failed", { error: "Invalid email address" })));
   if (!emailSettings().enabled) {
     valid.forEach((i) => skippedNotice(kind, i.msg));
-    await log(valid.map((i) => logRow(kind, i.msg, i.registrationId, "skipped")));
+    await log(valid.map((i) => logRow(kind, i.msg, forReg(i.registrationId), "skipped")));
     return { sent: 0, failed: invalid.length, skipped: valid.length };
   }
   let sent = 0;
@@ -139,12 +147,12 @@ export async function deliverBatch(kind: EmailKind, items: { msg: EmailMessage; 
     const chunk = valid.slice(k, k + BATCH_SIZE);
     try {
       const r = (await resend("/emails/batch", chunk.map((i) => payload(kind, i.msg)))) as { data?: { id: string }[] };
-      await log(chunk.map((i, j) => logRow(kind, i.msg, i.registrationId, "sent", { providerId: r.data?.[j]?.id ?? null })));
+      await log(chunk.map((i, j) => logRow(kind, i.msg, forReg(i.registrationId), "sent", { providerId: r.data?.[j]?.id ?? null })));
       sent += chunk.length;
     } catch (e) {
       const error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       console.error(`[email] ${kind} batch failed: ${error}`);
-      await log(chunk.map((i) => logRow(kind, i.msg, i.registrationId, "failed", { error })));
+      await log(chunk.map((i) => logRow(kind, i.msg, forReg(i.registrationId), "failed", { error })));
       failed += chunk.length;
       if (e instanceof ResendError && e.quota) {
         // The rest would fail too. They stay waiting, so the next "Send result emails" click (e.g. tomorrow) picks them up.

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LoginForm } from "@/components/forms/login-form";
 import { Card, Eyebrow } from "@/components/ui";
 
-export const metadata: Metadata = { title: "Student login" };
+export const metadata: Metadata = { title: "Student login", robots: { index: false, follow: true } };
 
 export default function LoginPage() {
   return (
@@ -20,7 +20,7 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-sm text-ink/60">
           New here?{" "}
           <Link href="/register" className="font-semibold text-indigo-600 hover:underline">
-            Register for ₹10
+            Register now
           </Link>
         </p>
       </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { type Phase, phaseAt, times } from "@/lib/config";
+import { useIndividualPrice } from "./offer-countdown";
 import { btn, cn } from "./ui";
 
 function useNow(intervalMs = 1000) {
@@ -69,6 +70,7 @@ export function Countdown({ dark = true, className }: { dark?: boolean; classNam
 
 export function PhaseCta() {
   const now = useNow(30_000);
+  const price = useIndividualPrice();
   const phase = now ? phaseAt(now) : "upcoming";
   if (phase === "results")
     return (
@@ -84,7 +86,7 @@ export function PhaseCta() {
     );
   return (
     <Link href="/register" className={btn("gold", "lg")}>
-      Register now · only ₹10
+      Register now · only {price}
     </Link>
   );
 }

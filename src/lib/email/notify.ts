@@ -4,8 +4,20 @@ import { after } from "next/server";
 import { upiDetails } from "../config";
 import { db, schema } from "../db";
 import type { Registration } from "../db/schema";
+import { slotAt } from "../slots";
 import { deliver, deliverBatch } from "./send";
-import { examSubmittedEmail, paymentRejectedEmail, paymentVerifiedEmail, pinResetEmail, registeredEmail, resultsEmail } from "./templates";
+import {
+  examSubmittedEmail,
+  paymentRejectedEmail,
+  paymentVerifiedEmail,
+  pinResetEmail,
+  registeredEmail,
+  resultsEmail,
+  schoolPaymentRejectedEmail,
+  schoolPaymentVerifiedEmail,
+  schoolRegisteredEmail,
+  slotBookedEmail,
+} from "./templates";
 
 /** Runs after the response is sent, so a slow mail server never delays the parent's page. */
 function later(label: string, fn: () => Promise<unknown>) {
@@ -34,6 +46,36 @@ export function notifyRegistrations(kind: RegKind, ids: string[]) {
         await deliver(kind, paymentRejectedEmail(r), { registrationId: r.id, idempotencyKey: `rejected-${r.id}-${r.paymentSubmittedAt?.getTime() ?? 0}` });
       }
     }
+  });
+}
+
+/** Confirms a booked (or moved) exam slot to the parent, when we have their email. */
+export function notifySlotBooked(registrationId: string) {
+  later("slot_booked", async () => {
+    const r = await db.query.registrations.findFirst({ where: eq(schema.registrations.id, registrationId) });
+    const slot = slotAt(r?.slotStart);
+    if (!r?.email || !slot) return;
+    await deliver("slot_booked", slotBookedEmail(r, slot), {
+      registrationId,
+      idempotencyKey: `slot-${registrationId}-${slot.start}-${r.slotBookedAt?.getTime() ?? 0}`,
+    });
+  });
+}
+
+type SchoolKind = "school_registered" | "school_payment_verified" | "school_payment_rejected";
+
+export function notifySchool(kind: SchoolKind, schoolId: string) {
+  later(kind, async () => {
+    const s = await db.query.schools.findFirst({ where: eq(schema.schools.id, schoolId) });
+    if (!s) return;
+    const msg =
+      kind === "school_registered"
+        ? schoolRegisteredEmail(s, upiDetails())
+        : kind === "school_payment_verified"
+          ? schoolPaymentVerifiedEmail(s)
+          : schoolPaymentRejectedEmail(s);
+    const stamp = kind === "school_payment_verified" ? s.paymentVerifiedAt?.getTime() : kind === "school_payment_rejected" ? s.paymentSubmittedAt?.getTime() : 0;
+    await deliver(kind, msg, { schoolId, idempotencyKey: `${kind}-${schoolId}-${stamp ?? 0}` });
   });
 }
 

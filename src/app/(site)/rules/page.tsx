@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import { ProsePage } from "@/components/prose-page";
 import { Card } from "@/components/ui";
-import { fee, schedule, site } from "@/lib/config";
+import { pricing, schedule, site, slotRules, toppersReward } from "@/lib/config";
 import { GRADES, STAGES, describeSection, totalQuestions } from "@/lib/exam/papers";
 import { fmtDateTime } from "@/lib/format";
+import { OFFER_END_LABEL, rupees } from "@/lib/pricing";
 
-export const metadata: Metadata = { title: "Rules & syllabus" };
+export const metadata: Metadata = {
+  title: "Rules & syllabus",
+  description: `Rules, class-wise syllabus, exam slots, scoring and awards of the ${site.name}.`,
+  alternates: { canonical: "/rules" },
+};
 
 export default function RulesPage() {
   return (
@@ -17,7 +22,14 @@ export default function RulesPage() {
       <h2>1. Eligibility</h2>
       <ul>
         <li>Open to students aged 4 to 18 years as on 1 December 2026, from any school, academy or home-learning background.</li>
-        <li>Registration fee is ₹{fee.amount} per student, paid by UPI. Each student needs a separate registration and payment.</li>
+        <li>
+          Registration fee: {rupees(pricing.individual.regular)} per student, or {rupees(pricing.individual.offer)} with the launch offer for
+          registrations made by {OFFER_END_LABEL} 2026. Paid by UPI; each student needs a separate registration and payment.
+        </li>
+        <li>
+          Schools can instead register any number of students for one school fee of {rupees(pricing.school.regular)} ({rupees(pricing.school.offer)} with the
+          launch offer until {OFFER_END_LABEL}). Students registered by a school pay nothing themselves.
+        </li>
         <li>Students compete in their school class for the current session (Nursery to Class 12). Each class accepts a sensible age range, shown below, so that no child takes an easier paper than their class.</li>
       </ul>
 
@@ -49,12 +61,14 @@ export default function RulesPage() {
         ))}
       </div>
 
-      <h2>4. Exam window & attempt</h2>
+      <h2>4. Exam slots & attempt</h2>
       <ul>
         <li>
-          The exam can be started any time between <strong>{fmtDateTime(schedule.examStart)}</strong> and{" "}
-          <strong>{fmtDateTime(schedule.examEnd)}</strong> IST.
+          The exam runs between <strong>{fmtDateTime(schedule.examStart)}</strong> and <strong>{fmtDateTime(schedule.examEnd)}</strong> IST, in
+          one-hour slots. After paying, each student books one slot ({slotRules.capacity} seats per slot, first come, first served).
         </li>
+        <li>The exam can only be started during the booked slot. A student who misses their slot may book another open slot before the window closes.</li>
+        <li>A slot can be changed any time before the exam is started.</li>
         <li>Each student gets exactly one attempt. Once started, the timer cannot be paused, restarted or extended.</li>
         <li>The paper is submitted automatically when time runs out. Answers saved before the deadline are evaluated.</li>
         <li>Every student receives a unique paper of identical difficulty for their class, with the options in a different order.</li>
@@ -73,7 +87,7 @@ export default function RulesPage() {
       <ul>
         <li>Each correct answer earns 1 mark. There is no negative marking, and an unanswered question scores zero.</li>
         <li>Students are ranked within their class by score (highest first). Ties are broken by the shorter time taken, then by the earlier submission.</li>
-        <li>Only students with a verified ₹{fee.amount} payment are ranked.</li>
+        <li>Only students with a verified payment (their own, or their school&apos;s) are ranked.</li>
       </ul>
 
       <h2>7. Awards</h2>
@@ -86,6 +100,10 @@ export default function RulesPage() {
         </li>
         <li>
           <strong>Participation</strong> — every other student who completes the exam.
+        </li>
+        <li>
+          <strong>Surprise gift voucher</strong> — the Champion (rank 1) of every class also wins a gift voucher chosen by us.{" "}
+          {toppersReward.delivery}
         </li>
         <li>All certificates are digital, carry a unique number and a QR code for verification.</li>
       </ul>

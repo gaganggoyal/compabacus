@@ -1,8 +1,10 @@
 import "server-only";
-import { fee, foundersLine, site, times } from "../config";
-import type { Award, Registration } from "../db/schema";
+import { foundersLine, site, slotRules, times } from "../config";
+import type { Award, Registration, School } from "../db/schema";
 import { gradeById, gradeLabel, totalQuestions } from "../exam/papers";
 import { AWARD_META, fmtDate, fmtDateTime } from "../format";
+import { rupees } from "../pricing";
+import { type Slot, calendarLink, slotAt, slotLabel } from "../slots";
 
 export type EmailMessage = { to: string; subject: string; html: string; text: string };
 
@@ -73,10 +75,11 @@ ${esc(site.shortName)} &middot; founded by ${esc(foundersLine())} &middot; ${esc
 const EXAM_WINDOW = `${fmtDate(times.examStart, { day: "numeric", month: "long", year: undefined })} to ${fmtDate(times.examEnd, { day: "numeric", month: "long", year: "numeric" })}`;
 const RESULTS_AT = `${fmtDate(times.resultsAt, { day: "numeric", month: "long", year: "numeric" })}, 12:00 AM IST`;
 
-type Reg = Pick<Registration, "id" | "regNo" | "studentName" | "parentName" | "grade" | "email" | "paymentNote">;
+type Reg = Pick<Registration, "id" | "regNo" | "studentName" | "parentName" | "grade" | "email" | "paymentNote" | "feeAmount" | "slotStart" | "schoolId">;
 
 export function registeredEmail(r: Reg, upi: { vpa: string; ready: boolean }): EmailMessage {
-  return render(r.email!, `${r.studentName} is registered · ${r.regNo}`, `Registration number ${r.regNo}. Next step: pay ₹${fee.amount} to confirm.`, [
+  const fee = rupees(r.feeAmount);
+  return render(r.email!, `${r.studentName} is registered · ${r.regNo}`, `Registration number ${r.regNo}. Next step: pay ${fee} to confirm.`, [
     { h: `Welcome to ${site.shortName}!` },
     { p: `Hi ${firstName(r.parentName)}, thank you for registering ${r.studentName} for the ${site.name}.` },
     {
@@ -90,36 +93,98 @@ export function registeredEmail(r: Reg, upi: { vpa: string; ready: boolean }): E
     { p: "Keep this email. You log in with the registration number above and the 6-digit PIN you created. We never send your PIN by email." },
     {
       p: upi.ready
-        ? `Next step: pay ₹${fee.amount} by UPI to ${upi.vpa}, then enter the 12-digit UPI reference number (UTR) on the payment page.`
-        : `Next step: pay ₹${fee.amount} by UPI on the payment page, then enter the 12-digit UPI reference number (UTR).`,
+        ? `Next step: pay ${fee} by UPI to ${upi.vpa}, then enter the 12-digit UPI reference number (UTR) on the payment page. After that, book a one-hour exam slot in December.`
+        : `Next step: pay ${fee} by UPI on the payment page, then enter the 12-digit UPI reference number (UTR). After that, book a one-hour exam slot in December.`,
     },
-    { button: `Pay ₹${fee.amount} and confirm`, href: abs("/dashboard/payment") },
+    { button: `Pay ${fee} and confirm`, href: abs("/dashboard/payment") },
     { link: "Practise with free mock tests", href: abs(`/practice?class=${r.grade}`) },
   ]);
 }
 
 export function paymentVerifiedEmail(r: Reg): EmailMessage {
   const g = gradeById(r.grade);
-  return render(r.email!, `Payment verified: ${r.studentName} is confirmed`, `See you in the exam, ${EXAM_WINDOW}.`, [
+  const slot = slotAt(r.slotStart);
+  return render(r.email!, `Payment verified: ${r.studentName} is confirmed`, slot ? `Exam slot: ${slotLabel(slot)}.` : "Next: book your exam slot.", [
     { h: "You're all set!" },
-    { p: `Hi ${firstName(r.parentName)}, we have verified the ₹${fee.amount} payment for ${r.studentName} (${r.regNo}). ${r.studentName} is confirmed for the ${gradeLabel(r.grade)} paper.` },
+    { p: `Hi ${firstName(r.parentName)}, we have verified the ${rupees(r.feeAmount)} payment for ${r.studentName} (${r.regNo}). ${r.studentName} is confirmed for the ${gradeLabel(r.grade)} paper.` },
     {
       facts: [
         ...(g ? ([["Paper", `${totalQuestions(g.paper)} multiple-choice questions · ${g.paper.durationSec / 60} minutes`]] as [string, string][]) : []),
-        ["Exam window", `${EXAM_WINDOW}, any day, from home`],
+        ["Exam slot", slot ? slotLabel(slot) : "Not booked yet: pick a one-hour slot in December"],
         ["Results", RESULTS_AT],
       ],
     },
     { p: "Use a phone, tablet or computer with a steady internet connection. There is one attempt, so practise first with the free mock tests." },
-    { button: "Open dashboard", href: abs("/dashboard") },
+    slot ? { button: "Open dashboard", href: abs("/dashboard") } : { button: "Book your exam slot", href: abs("/dashboard/slot") },
     { link: "Free mock tests", href: abs(`/practice?class=${r.grade}`) },
+  ]);
+}
+
+export function slotBookedEmail(r: Reg, slot: Slot): EmailMessage {
+  const g = gradeById(r.grade);
+  return render(r.email!, `Exam slot booked: ${slotLabel(slot)}`, `${r.studentName} can start the exam any time during this hour.`, [
+    { h: "Exam slot booked" },
+    { p: `Hi ${firstName(r.parentName)}, ${r.studentName}'s exam slot is booked.` },
+    {
+      facts: [
+        ["Slot", slotLabel(slot)],
+        ["Student", `${r.studentName} (${r.regNo})`],
+        ...(g ? ([["Paper", `${gradeLabel(r.grade)} · ${totalQuestions(g.paper)} questions · ${g.paper.durationSec / 60} minutes`]] as [string, string][]) : []),
+      ],
+    },
+    { p: `Log in a few minutes early and press Start any time during the ${slotRules.minutes}-minute slot. If you miss it, book another open slot from the dashboard.` },
+    { button: "Add to Google Calendar", href: calendarLink(slot, `${site.shortName} exam: ${r.studentName}`, `Log in at ${abs("/login")} with ${r.regNo} and start the exam during this hour.`) },
+    { link: "Open dashboard", href: abs("/dashboard") },
+  ]);
+}
+
+type SchoolMsg = Pick<School, "code" | "name" | "contactName" | "email" | "feeAmount" | "paymentNote">;
+
+export function schoolRegisteredEmail(s: SchoolMsg, upi: { vpa: string; ready: boolean }): EmailMessage {
+  const fee = rupees(s.feeAmount);
+  return render(s.email, `${s.name} is registered · ${s.code}`, `School code ${s.code}. Next step: pay ${fee} to confirm.`, [
+    { h: `Welcome to ${site.shortName}!` },
+    { p: `Hi ${firstName(s.contactName)}, thank you for registering ${s.name} for the ${site.name}.` },
+    {
+      facts: [
+        ["School code", s.code],
+        ["Login", `${s.email} and the password you chose`],
+        ["School fee", `${fee}, one time, any number of students`],
+      ],
+    },
+    {
+      p: upi.ready
+        ? `Next step: pay ${fee} by UPI to ${upi.vpa}, then enter the 12-digit UPI reference number (UTR) in your school dashboard.`
+        : `Next step: pay ${fee} by UPI from your school dashboard, then enter the 12-digit UPI reference number (UTR).`,
+    },
+    { p: "You can add students right away. Every student gets a registration number and PIN that you can print as login slips." },
+    { button: "Open school dashboard", href: abs("/schools/dashboard") },
+  ]);
+}
+
+export function schoolPaymentVerifiedEmail(s: SchoolMsg): EmailMessage {
+  return render(s.email, `Payment verified: ${s.name} is confirmed`, "Your students can now book exam slots.", [
+    { h: "Your school is confirmed!" },
+    { p: `Hi ${firstName(s.contactName)}, we have verified the ${rupees(s.feeAmount)} payment for ${s.name} (${s.code}). Every student you add is covered.` },
+    { p: "Next: add your students, print their login slips, and book a one-hour exam slot for each student (or let them book it themselves)." },
+    { button: "Open school dashboard", href: abs("/schools/dashboard") },
+  ]);
+}
+
+export function schoolPaymentRejectedEmail(s: SchoolMsg): EmailMessage {
+  return render(s.email, `Action needed: payment for ${s.code} not verified`, "Please check the UPI reference number and submit it again.", [
+    { h: "We couldn't verify your payment" },
+    { p: `Hi ${firstName(s.contactName)}, we couldn't match the UPI reference entered for ${s.name} (${s.code}) with a ${rupees(s.feeAmount)} payment in our account.` },
+    ...(s.paymentNote ? [{ note: s.paymentNote }] : []),
+    { p: "Please check the 12-digit UTR in your UPI app and submit it again from the school dashboard." },
+    { button: "Fix payment", href: abs("/schools/dashboard/payment") },
   ]);
 }
 
 export function paymentRejectedEmail(r: Reg): EmailMessage {
   return render(r.email!, `Action needed: payment for ${r.regNo} not verified`, "Please check the UPI reference number and submit it again.", [
     { h: "We couldn't verify your payment" },
-    { p: `Hi ${firstName(r.parentName)}, we couldn't match the UPI reference you entered for ${r.studentName} (${r.regNo}) with a ₹${fee.amount} payment in our account.` },
+    { p: `Hi ${firstName(r.parentName)}, we couldn't match the UPI reference you entered for ${r.studentName} (${r.regNo}) with a ${rupees(r.feeAmount)} payment in our account.` },
     ...(r.paymentNote ? [{ note: r.paymentNote }] : []),
     { p: "Please check the 12-digit UTR in your UPI app and submit it again. If you haven't paid yet, you can pay on the same page." },
     { button: "Fix payment", href: abs("/dashboard/payment") },
@@ -156,6 +221,15 @@ export function resultsEmail(r: Reg, a: ResultInfo): EmailMessage {
         ["Certificate no.", a.certNo],
       ],
     },
+    ...(a.award === "champion"
+      ? [
+          {
+            note: `🎁 As the class topper, ${firstName(r.studentName)} has also won a surprise gift voucher! ${
+              r.schoolId ? "We'll send it through the school." : "We'll send it to your registered email or mobile number soon."
+            } We never ask for any payment, OTP or bank details.`,
+          },
+        ]
+      : []),
     { button: "Download certificate", href: abs(`/certificate/${encodeURIComponent(a.certNo)}`) },
     { link: "See the Hall of Fame", href: abs("/results") },
   ]);

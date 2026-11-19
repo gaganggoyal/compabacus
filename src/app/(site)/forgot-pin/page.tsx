@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ForgotPinForm } from "@/components/forms/pin-reset-forms";
 import { Card, Eyebrow } from "@/components/ui";
 
-export const metadata: Metadata = { title: "Forgot PIN" };
+export const metadata: Metadata = { title: "Forgot PIN", robots: { index: false, follow: true } };
 
 export default function ForgotPinPage() {
   return (

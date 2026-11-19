@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
@@ -43,4 +43,32 @@ export function newId() {
 
 export function randomSeed() {
   return randomInt(1, 2 ** 31 - 1);
+}
+
+/** AES-256-GCM key for PINs of school-registered students, derived from SESSION_SECRET. */
+function pinKey() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) throw new Error("SESSION_SECRET must be set to at least 32 characters");
+  return createHash("sha256").update(`kudoscup-pin-v1:${secret}`).digest();
+}
+
+/** Encrypts a PIN so the school that registered the student can print it later. Logins still check the scrypt hash. */
+export function encryptPin(pin: string) {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", pinKey(), iv);
+  const enc = Buffer.concat([c.update(pin, "utf8"), c.final()]);
+  return ["v1", iv, enc, c.getAuthTag()].map((p) => (typeof p === "string" ? p : p.toString("base64url"))).join(":");
+}
+
+export function decryptPin(stored: string | null | undefined) {
+  if (!stored) return null;
+  try {
+    const [v, iv, enc, tag] = stored.split(":");
+    if (v !== "v1") return null;
+    const d = createDecipheriv("aes-256-gcm", pinKey(), Buffer.from(iv, "base64url"));
+    d.setAuthTag(Buffer.from(tag, "base64url"));
+    return Buffer.concat([d.update(Buffer.from(enc, "base64url")), d.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
 }

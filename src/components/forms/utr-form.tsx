@@ -4,8 +4,15 @@ import { useActionState } from "react";
 import { type FormState, submitUtrAction } from "@/app/actions/student";
 import { Field, btn, cn, inputCls } from "@/components/ui";
 
-export function UtrForm({ existing }: { existing?: string | null }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(submitUtrAction, {});
+export function UtrForm({
+  existing,
+  submit = submitUtrAction,
+}: {
+  existing?: string | null;
+  /** Defaults to the student payment; the school payment page passes its own action. */
+  submit?: (prev: FormState, formData: FormData) => Promise<FormState>;
+}) {
+  const [state, action, pending] = useActionState<FormState, FormData>(submit, {});
   return (
     <form action={action} className="space-y-4">
       <Field

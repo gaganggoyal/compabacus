@@ -8,6 +8,8 @@ import { db, schema } from "@/lib/db";
 import { PAYMENT_STATUSES } from "@/lib/db/schema";
 import { GRADES, gradeLabel } from "@/lib/exam/papers";
 import { fmtDateTime } from "@/lib/format";
+import { rupees } from "@/lib/pricing";
+import { slotAt, slotDay, slotTime } from "@/lib/slots";
 
 const PAGE = 50;
 
@@ -30,6 +32,7 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
   const q = str("q").trim();
   const pay = str("pay");
   const grade = str("grade");
+  const schoolId = str("school");
   const page = Math.max(1, Number(str("page")) || 1);
 
   const where: SQL[] = [];
@@ -44,11 +47,13 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
         like(schema.registrations.parentName, p),
         like(schema.registrations.email, p),
         like(schema.registrations.utr, p),
+        like(schema.registrations.school, p),
       )!,
     );
   }
   if ((PAYMENT_STATUSES as readonly string[]).includes(pay)) where.push(eq(schema.registrations.paymentStatus, pay as (typeof PAYMENT_STATUSES)[number]));
   if (grade) where.push(eq(schema.registrations.grade, grade));
+  if (schoolId) where.push(eq(schema.registrations.schoolId, schoolId));
   const cond = where.length ? and(...where) : undefined;
 
   const [{ n }] = await db.select({ n: count() }).from(schema.registrations).where(cond);
@@ -61,7 +66,7 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
     .offset((page - 1) * PAGE);
   const pages = Math.max(1, Math.ceil(n / PAGE));
   const qs = (p: number) => {
-    const u = new URLSearchParams({ q, pay, grade, page: String(p) });
+    const u = new URLSearchParams({ q, pay, grade, ...(schoolId ? { school: schoolId } : {}), page: String(p) });
     return `/admin/registrations?${u.toString()}`;
   };
 
@@ -72,6 +77,7 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
         <p className="text-sm text-ink/55">{n} found</p>
       </div>
       <form className="grid gap-2 rounded-2xl bg-white p-3 ring-1 ring-ink/8 sm:grid-cols-[2fr_1fr_1fr_auto]">
+        {schoolId && <input type="hidden" name="school" value={schoolId} />}
         <input name="q" defaultValue={q} placeholder="Search name, reg no, phone, email, city, UTR…" className={inputCls} />
         <select name="pay" defaultValue={pay} className={inputCls}>
           <option value="">Any payment</option>
@@ -117,6 +123,11 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
                     {r.dob} · {r.city}, {r.state}
                   </p>
                   {r.school && <p className="text-xs text-ink/40">{r.school}</p>}
+                  {r.schoolId && (
+                    <Link href={`/admin/registrations?school=${r.schoolId}`} className="mt-1 inline-block">
+                      <Badge tone="violet">School registration</Badge>
+                    </Link>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-xs font-semibold">{gradeLabel(r.grade)}</td>
                 <td className="px-4 py-3 text-xs">
@@ -128,12 +139,17 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
                 </td>
                 <td className="px-4 py-3">
                   <Badge tone={payTone(r.paymentStatus)}>{r.paymentStatus}</Badge>
+                  <p className="mt-1 text-[11px] text-ink/50">{r.schoolId ? "via school" : rupees(r.feeAmount)}</p>
                   {r.utr && <p className="mt-1 font-mono text-[11px] text-ink/50">{r.utr}</p>}
+                  {(() => {
+                    const slot = slotAt(r.slotStart);
+                    return slot ? <p className="mt-1 text-[11px] font-semibold text-indigo-700">Slot {slotDay(slot.start)}, {slotTime(slot.start)}</p> : null;
+                  })()}
                 </td>
                 <td className="px-4 py-3 text-xs text-ink/55">{fmtDateTime(r.createdAt)}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-col items-end gap-1.5">
-                    <PaymentActions id={r.id} status={r.paymentStatus} />
+                    {!r.schoolId && <PaymentActions id={r.id} status={r.paymentStatus} />}
                     <ResetPinButton id={r.id} regNo={r.regNo} />
                   </div>
                 </td>

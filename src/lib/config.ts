@@ -22,9 +22,11 @@ export const site = {
   ],
   /** The brand domain. Emails are sent from it. */
   domain: "kudoscup.com",
-  tagline: "India's ₹10 online abacus championship, Nursery to Class 12",
+  tagline: "India's online abacus championship for Nursery to Class 12",
   regPrefix: "KC26",
   certPrefix: "KCC26",
+  /** School account codes, e.g. KCS26-48213. */
+  schoolPrefix: "KCS26",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   contact: {
     phone: "+91 95696 08101",
@@ -43,10 +45,24 @@ export const schedule = {
   resultsAt: "2027-01-01T00:00:00+05:30",
 } as const;
 
-export const fee = {
-  amount: 10,
+/**
+ * Fees in rupees. The launch offer is real: from `offerEndsAt` new sign-ups pay the regular price.
+ * Each registration stores the fee it was created with, so anyone who signed up during the offer keeps it.
+ */
+export const pricing = {
+  individual: { regular: 499, offer: 10 },
+  school: { regular: 9999, offer: 999 },
+  offerEndsAt: "2026-12-25T23:59:59+05:30",
   currency: "INR",
-};
+} as const;
+
+/** Exam slots: the exam can only be started during the hour a student booked. */
+export const slotRules = {
+  capacity: 100,
+  minutes: 60,
+  /** Share of seats taken before a slot is labelled "Filling fast". */
+  fillingFastAt: 0.7,
+} as const;
 
 /** Server-only payment details (read from env so they never ship in code). */
 export function upiDetails() {
@@ -68,7 +84,7 @@ export const prizes = [
   {
     id: "champion",
     title: "Champion",
-    detail: "Gold e-trophy certificate + Hall of Fame spot for #1 in every class",
+    detail: "Gold e-trophy certificate, Hall of Fame spot and a surprise gift voucher for #1 in every class",
   },
   {
     id: "runners",
@@ -86,6 +102,17 @@ export const prizes = [
     detail: "Verified e-certificate with QR code for every participant",
   },
 ] as const;
+
+/**
+ * Surprise prize for the toppers (user, 2026-11-19): the Champion (rank 1) of every class wins a gift voucher chosen by the
+ * organiser, so up to 15 vouchers (one per class). Sent after the results to the contact details given at registration.
+ */
+export const toppersReward = {
+  short: "Surprise gift vouchers for toppers",
+  line: "The topper of every class wins a surprise gift voucher.",
+  delivery:
+    "After the results we send the voucher to the parent's registered email or mobile number (or through the school, for students it registered). We never ask for any payment, OTP or bank details to send it.",
+} as const;
 
 /** Age limits on the reference date. Each class also has its own allowed age range (see exam/papers.ts). */
 export const MIN_AGE = 4;

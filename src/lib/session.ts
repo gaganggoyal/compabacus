@@ -54,6 +54,22 @@ export async function clearStudentSession() {
   (await cookies()).delete(STUDENT_COOKIE);
 }
 
+const SCHOOL_COOKIE = "kc_school";
+
+export async function setSchoolSession(schoolId: string) {
+  const ttl = 60 * 60 * 24 * 30;
+  const token = await sign({ role: "school" }, schoolId, ttl);
+  (await cookies()).set(SCHOOL_COOKIE, token, { ...cookieBase, maxAge: ttl });
+}
+
+export async function getSchoolId() {
+  return verify((await cookies()).get(SCHOOL_COOKIE)?.value, "school");
+}
+
+export async function clearSchoolSession() {
+  (await cookies()).delete(SCHOOL_COOKIE);
+}
+
 export async function setAdminSession() {
   const ttl = 60 * 60 * 12;
   const token = await sign({ role: "admin" }, "admin", ttl);

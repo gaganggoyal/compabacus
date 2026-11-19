@@ -2,7 +2,19 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db, schema } from "./db";
-import { getStudentId, isAdmin } from "./session";
+import { getSchoolId, getStudentId, isAdmin } from "./session";
+
+export async function currentSchool() {
+  const id = await getSchoolId();
+  if (!id) return null;
+  return (await db.query.schools.findFirst({ where: eq(schema.schools.id, id) })) ?? null;
+}
+
+export async function requireSchool() {
+  const school = await currentSchool();
+  if (!school) redirect("/schools/login");
+  return school;
+}
 
 export async function currentStudent() {
   const id = await getStudentId();

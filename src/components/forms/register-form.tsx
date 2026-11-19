@@ -4,12 +4,14 @@ import { Check, Lock, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useState, startTransition } from "react";
 import { type FormState, registerAction } from "@/app/actions/student";
+import { useIndividualPrice } from "@/components/offer-countdown";
 import { Field, btn, cn, inputCls } from "@/components/ui";
 import { INDIAN_STATES, MAX_AGE, MIN_AGE, ageOn } from "@/lib/config";
 import { GRADES, STAGES, gradeById, totalQuestions } from "@/lib/exam/papers";
 
 export function RegisterForm() {
   const [state, action, pending] = useActionState<FormState, FormData>(registerAction, {});
+  const price = useIndividualPrice();
   const [dob, setDob] = useState("");
   const [grade, setGrade] = useState("");
   const [stateName, setStateName] = useState("");
@@ -205,7 +207,7 @@ export function RegisterForm() {
 
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
         <button type="submit" disabled={pending} className={btn("primary", "lg")}>
-          {pending ? "Creating registration…" : "Continue to payment · ₹10"}
+          {pending ? "Creating registration…" : `Continue to payment · ${price}`}
         </button>
         <p className="flex items-center gap-1.5 text-sm text-ink/50">
           <ShieldCheck className="h-4 w-4 text-emerald-600" /> Your details are never shared or sold.

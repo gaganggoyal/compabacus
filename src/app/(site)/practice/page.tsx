@@ -6,6 +6,7 @@ import { Eyebrow } from "@/components/ui";
 export const metadata: Metadata = {
   title: "Free Abacus Mock Tests",
   description: "Unlimited free class-wise abacus mock tests from Nursery to Class 12, multiple choice, with instant scores and answer review.",
+  alternates: { canonical: "/practice" },
 };
 
 /** Lets links like /practice?class=C3 open with that class already selected. */

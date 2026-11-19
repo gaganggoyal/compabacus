@@ -25,10 +25,13 @@ export function SiteFooter() {
           <p className="text-sm font-bold text-white">Competition</p>
           <ul className="mt-4 space-y-2.5 text-sm">
             <li><Link className="hover:text-white" href="/register">Register</Link></li>
+            <li><Link className="hover:text-white" href="/schedule">Exam slots</Link></li>
             <li><Link className="hover:text-white" href="/practice">Free mock tests</Link></li>
             <li><Link className="hover:text-white" href="/rules">Rules & syllabus</Link></li>
             <li><Link className="hover:text-white" href="/results">Results & Hall of Fame</Link></li>
             <li><Link className="hover:text-white" href="/verify">Verify a certificate</Link></li>
+            <li><Link className="hover:text-white" href="/schools">For schools</Link></li>
+            <li><Link className="hover:text-white" href="/schools/login">School login</Link></li>
           </ul>
         </div>
         <div>
@@ -47,11 +50,15 @@ export function SiteFooter() {
                 <WhatsAppIcon className="h-4 w-4 text-emerald-400" /> WhatsApp us
               </a>
             </li>
-            <li className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-amber-300" /> {site.contact.phone}
+            <li>
+              <a href={`tel:+${site.contact.whatsapp}`} className="inline-flex items-center gap-2 hover:text-white">
+                <Phone className="h-4 w-4 text-amber-300" /> {site.contact.phone}
+              </a>
             </li>
-            <li className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-amber-300" /> {site.contact.email}
+            <li>
+              <a href={`mailto:${site.contact.email}`} className="inline-flex items-center gap-2 hover:text-white">
+                <Mail className="h-4 w-4 text-amber-300" /> {site.contact.email}
+              </a>
             </li>
             <li className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-amber-300" /> {site.contact.city}

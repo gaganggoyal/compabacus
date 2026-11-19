@@ -1,18 +1,19 @@
-import { Crown, Medal, Trophy, Users } from "lucide-react";
+import { Crown, Gift, Medal, Trophy, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requestNow } from "@/lib/now";
 import { Suspense } from "react";
 import { Countdown } from "@/components/countdown";
 import { Card, PageLoading, cn } from "@/components/ui";
-import { times } from "@/lib/config";
+import { times, toppersReward } from "@/lib/config";
 import { GRADES, STAGES } from "@/lib/exam/papers";
 import { fmtDateTime, fmtDuration, publicName } from "@/lib/format";
 import { type RankedRow, rankedResults, resultsLive } from "@/lib/results";
 
 export const metadata: Metadata = {
   title: "Results & Hall of Fame",
-  description: "Champions and runners-up of every class, Nursery to Class 12.",
+  description: "Champions and runners-up of every class, Nursery to Class 12, in the Kudos Cup Abacus Championship 2026. Results go live on 1 January 2027.",
+  alternates: { canonical: "/results" },
 };
 
 export default function ResultsPage({ searchParams }: PageProps<"/results">) {
@@ -37,6 +38,9 @@ async function Results({ searchParams }: { searchParams: PageProps<"/results">["
             Winners will be crowned on <span className="gold-text">New Year&apos;s Day</span>
           </h1>
           <p className="mt-4 text-lg text-indigo-100/75">Results go live at {fmtDateTime(times.resultsAt)} IST.</p>
+          <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-amber-400/15 px-4 py-2 text-sm font-semibold text-amber-200 ring-1 ring-amber-300/30">
+            <Gift className="h-4 w-4 shrink-0" /> {toppersReward.line}
+          </p>
           <Countdown className="mt-10 flex flex-col items-center" />
         </div>
       </section>
@@ -74,6 +78,9 @@ async function Results({ searchParams }: { searchParams: PageProps<"/results">["
               </div>
             ))}
           </div>
+          <p className="mx-auto mt-6 flex max-w-xl items-center justify-center gap-2 text-sm text-amber-200/90">
+            <Gift className="h-4 w-4 shrink-0" /> Every Champion below also wins a surprise gift voucher.
+          </p>
         </div>
       </section>
 
