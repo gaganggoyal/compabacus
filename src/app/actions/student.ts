@@ -1,13 +1,16 @@
 "use server";
 
-import { and, count, eq, ne } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
+import { and, count, eq, gt, ne } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { INDIAN_STATES, MAX_AGE, MIN_AGE, ageGroupFor, ageOn, examTestMode, site, times } from "@/lib/config";
+import { INDIAN_STATES, MAX_AGE, MIN_AGE, ageOn, examTestMode, site, times } from "@/lib/config";
 import { hashSecret, newId, randomDigits, verifySecret } from "@/lib/crypto";
 import { db, schema } from "@/lib/db";
-import { levelById } from "@/lib/exam/levels";
+import { notifyRegistrations, sendPinReset } from "@/lib/email/notify";
+import { EMAIL_RE } from "@/lib/email/send";
+import { gradeById, gradeLabel } from "@/lib/exam/papers";
 import { maskName } from "@/lib/format";
 import { requireStudent } from "@/lib/auth";
 import { clearStudentSession, setStudentSession } from "@/lib/session";
@@ -38,7 +41,7 @@ const registerSchema = z
     dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth is required"),
     gender: z.enum(["", "girl", "boy", "other"]).optional(),
     school: z.string().trim().max(100).optional(),
-    level: z.string().refine((v) => !!levelById(v), "Choose a level"),
+    grade: z.string().refine((v) => !!gradeById(v), "Choose your child's class"),
     parentName: text(2, 60, "Parent / guardian name"),
     phone: z.string().transform((v, ctx) => {
       const p = normalisePhone(v);
@@ -51,9 +54,9 @@ const registerSchema = z
     email: z
       .string()
       .trim()
-      .max(120)
-      .refine((v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Enter a valid email")
-      .optional(),
+      .toLowerCase()
+      .max(120, "Email is too long")
+      .regex(EMAIL_RE, "Enter a valid email. We send the registration number, payment confirmation and results here."),
     city: text(2, 60, "City"),
     state: z.string().refine((v) => (INDIAN_STATES as readonly string[]).includes(v), "Choose your state"),
     country: z.string().trim().max(60).optional(),
@@ -69,6 +72,15 @@ const registerSchema = z
         code: "custom",
         path: ["dob"],
         message: `Students must be ${MIN_AGE}–${MAX_AGE} years old on 1 Dec 2026 (this date gives ${Number.isNaN(age) ? "?" : age})`,
+      });
+      return;
+    }
+    const grade = gradeById(d.grade);
+    if (grade && (age < grade.ages[0] || age > grade.ages[1])) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["grade"],
+        message: `${grade.label} is for children aged ${grade.ages[0]}–${grade.ages[1]} on 1 Dec 2026, but this date of birth gives ${age}. Please check the class or date of birth.`,
       });
     }
   });
@@ -91,7 +103,6 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
     return { errors: issuesToErrors(parsed.error.issues), message: "Please fix the highlighted fields." };
   }
   const d = parsed.data;
-  const group = ageGroupFor(d.dob)!;
 
   const [{ n }] = await db.select({ n: count() }).from(schema.registrations).where(eq(schema.registrations.phone, d.phone));
   if (n >= 8) {
@@ -130,12 +141,11 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
     studentName: d.studentName,
     dob: d.dob,
     gender: d.gender || null,
-    ageGroup: group.id,
-    level: d.level,
+    grade: d.grade,
     school: d.school || null,
     parentName: d.parentName,
     phone: d.phone,
-    email: d.email || null,
+    email: d.email,
     city: d.city,
     state: d.state,
     country: d.state === "Outside India" ? d.country?.trim() || "Other" : "India",
@@ -144,6 +154,7 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
     createdAt: now,
   });
 
+  notifyRegistrations("registered", [id]);
   await setStudentSession(id);
   redirect("/dashboard/payment?welcome=1");
 }
@@ -151,13 +162,15 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
 const LOCK_AFTER = 5;
 const LOCK_MS = 15 * 60 * 1000;
 
+/** "kc26 123456" and "123456" both become "KC26-123456". */
+function normaliseRegNo(raw: string) {
+  const regNo = raw.trim().toUpperCase().replace(/\s+/g, "");
+  return /^\d{6}$/.test(regNo) ? `${site.regPrefix}-${regNo}` : regNo;
+}
+
 export async function loginAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  let regNo = String(formData.get("regNo") ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "");
+  const regNo = normaliseRegNo(String(formData.get("regNo") ?? ""));
   const pin = String(formData.get("pin") ?? "").trim();
-  if (/^\d{6}$/.test(regNo)) regNo = `${site.regPrefix}-${regNo}`;
   if (!regNo || !/^\d{6}$/.test(pin)) {
     return { message: "Enter your registration number and 6-digit PIN." };
   }
@@ -194,7 +207,73 @@ export async function logoutAction() {
   redirect("/");
 }
 
-export type LookupState = { results?: { regNo: string; name: string; level: string }[]; message?: string };
+const RESET_TTL_MS = 30 * 60 * 1000;
+const RESETS_PER_HOUR = 3;
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+
+/** Emails a single-use "set a new PIN" link. Always gives the same answer, so it can't be used to discover registrations. */
+export async function requestPinResetAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const regNo = normaliseRegNo(String(formData.get("regNo") ?? ""));
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+  const errors: Record<string, string> = {};
+  if (!regNo) errors.regNo = "Enter the registration number";
+  if (!EMAIL_RE.test(email)) errors.email = "Enter the parent email used at registration";
+  if (Object.keys(errors).length) return { errors };
+
+  const done: FormState = {
+    ok: true,
+    message: "If these details match a registration, we've emailed a link to set a new PIN. It works for 30 minutes. Check the spam folder too.",
+  };
+  const reg = await db.query.registrations.findFirst({ where: eq(schema.registrations.regNo, regNo) });
+  if (!reg || reg.email?.toLowerCase() !== email) return done;
+
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(schema.emailLog)
+    .where(
+      and(
+        eq(schema.emailLog.registrationId, reg.id),
+        eq(schema.emailLog.kind, "pin_reset"),
+        gt(schema.emailLog.createdAt, new Date(Date.now() - 60 * 60 * 1000)),
+      ),
+    );
+  if (n >= RESETS_PER_HOUR) return done;
+
+  const token = randomBytes(32).toString("base64url");
+  await db
+    .update(schema.registrations)
+    .set({ pinResetHash: sha256(token), pinResetExpires: new Date(Date.now() + RESET_TTL_MS) })
+    .where(eq(schema.registrations.id, reg.id));
+  sendPinReset(reg, `${site.url}/reset-pin?token=${token}`);
+  return done;
+}
+
+export async function resetPinWithTokenAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const token = String(formData.get("token") ?? "");
+  const pin = String(formData.get("pin") ?? "").trim();
+  const pinConfirm = String(formData.get("pinConfirm") ?? "").trim();
+  if (!/^\d{6}$/.test(pin)) return { errors: { pin: "PIN must be exactly 6 digits" } };
+  if (pin !== pinConfirm) return { errors: { pinConfirm: "PINs do not match" } };
+
+  const expired: FormState = { message: "This link has expired or was already used. Please ask for a new one." };
+  if (!token) return expired;
+  const hash = sha256(token);
+  const reg = await db.query.registrations.findFirst({ where: eq(schema.registrations.pinResetHash, hash) });
+  if (!reg || !reg.pinResetExpires || reg.pinResetExpires.getTime() < Date.now()) return expired;
+
+  const res = await db
+    .update(schema.registrations)
+    .set({ pinHash: await hashSecret(pin), pinResetHash: null, pinResetExpires: null, failedLogins: 0, lockedUntil: null })
+    .where(and(eq(schema.registrations.id, reg.id), eq(schema.registrations.pinResetHash, hash)));
+  if (!res.rowsAffected) return expired;
+
+  await setStudentSession(reg.id);
+  redirect("/dashboard");
+}
+
+export type LookupState = { results?: { regNo: string; name: string; grade: string }[]; message?: string };
 
 export async function lookupByPhoneAction(_prev: LookupState, formData: FormData): Promise<LookupState> {
   const phone = normalisePhone(String(formData.get("phone") ?? ""));
@@ -202,7 +281,7 @@ export async function lookupByPhoneAction(_prev: LookupState, formData: FormData
   const rows = await db.query.registrations.findMany({ where: eq(schema.registrations.phone, phone), limit: 10 });
   if (!rows.length) return { message: "No registrations found for this number." };
   return {
-    results: rows.map((r) => ({ regNo: r.regNo, name: maskName(r.studentName), level: levelById(r.level)?.name ?? r.level })),
+    results: rows.map((r) => ({ regNo: r.regNo, name: maskName(r.studentName), grade: gradeLabel(r.grade) })),
   };
 }
 

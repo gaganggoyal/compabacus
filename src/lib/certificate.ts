@@ -1,9 +1,9 @@
 import "server-only";
 import { PDFDocument, type PDFFont, type PDFPage, StandardFonts, rgb } from "pdf-lib";
 import QRCode from "qrcode";
-import { ageGroupById, site, times } from "./config";
+import { site, times } from "./config";
 import type { Award } from "./db/schema";
-import { levelById } from "./exam/levels";
+import { gradeLabel } from "./exam/papers";
 import { AWARD_META, fmtDate } from "./format";
 
 const INK = rgb(21 / 255, 18 / 255, 59 / 255);
@@ -58,8 +58,7 @@ export type CertData = {
   rank: number | null;
   score: number | null;
   maxScore: number | null;
-  ageGroup: string;
-  level: string;
+  grade: string;
   studentName: string;
   school: string | null;
   city: string;
@@ -96,8 +95,6 @@ export async function renderCertificate(c: CertData) {
 
   const meta = AWARD_META[c.award];
   const podium = c.award === "champion" || c.award === "runner_up_1" || c.award === "runner_up_2";
-  const group = ageGroupById(c.ageGroup);
-  const level = levelById(c.level);
 
   center(page, site.organiser.toUpperCase(), H - 78, sansBold, 10, MUTED, 2.2);
   center(page, "CERTIFICATE", H - 132, serif, 46, INK, 6);
@@ -118,13 +115,15 @@ export async function renderCertificate(c: CertData) {
     c.award === "participation"
       ? `for participating in the ${site.name}`
       : `for being awarded ${meta.label.toUpperCase()} in the ${site.name}`;
-  const body = `${achievement}, Group ${group?.id ?? c.ageGroup} (${group?.label ?? ""}, ages ${group?.min}-${group?.max}) · ${level?.name ?? c.level} level, held online from 1 to 31 December 2026.`;
+  const body = `${achievement}, ${gradeLabel(c.grade)} category, held online from 1 to 31 December 2026.`;
   wrap(body, sans, 13, 560).forEach((line, i) => center(page, line, H - 322 - i * 19, sans, 13, INK));
 
   if (c.score != null && c.maxScore) {
     const stat = `Score ${c.score} / ${c.maxScore}${c.rank ? `   ·   Rank ${c.rank} in category` : ""}`;
     center(page, stat, H - 380, sansBold, 12, INK);
   }
+  const dateText = fmtDate(times.resultsAt, { day: "numeric", month: "long", year: "numeric" });
+  center(page, `Result declared on ${dateText}`, H - 400, sans, 10, MUTED);
 
   // Medal
   const mx = W / 2;
@@ -147,16 +146,19 @@ export async function renderCertificate(c: CertData) {
     page.drawText(label, { x: mx - lw / 2, y: my - (label === "*" ? 12 : 4), size, font: sansBold, color: CREAM });
   }
 
-  // Signature & date
-  page.drawLine({ start: { x: 110, y: 96 }, end: { x: 290, y: 96 }, thickness: 0.8, color: INK });
-  const dateText = fmtDate(times.resultsAt, { day: "numeric", month: "long", year: "numeric" });
-  page.drawText(latin(dateText), { x: 200 - sansBold.widthOfTextAtSize(latin(dateText), 11) / 2, y: 104, size: 11, font: sansBold, color: INK });
-  page.drawText("Date of result", { x: 200 - sans.widthOfTextAtSize("Date of result", 9) / 2, y: 82, size: 9, font: sans, color: MUTED });
-
-  page.drawLine({ start: { x: W - 300, y: 96 }, end: { x: W - 120, y: 96 }, thickness: 0.8, color: INK });
-  const org = latin(site.organiser);
-  page.drawText("Organiser", { x: W - 210 - sans.widthOfTextAtSize("Organiser", 9) / 2, y: 82, size: 9, font: sans, color: MUTED });
-  page.drawText(org, { x: W - 210 - serifItalic.widthOfTextAtSize(org, 13) / 2, y: 104, size: 13, font: serifItalic, color: INK });
+  // Signatories: the founders, left and right of the medal
+  const [left, right] = site.founders;
+  for (const [f, cx] of [
+    [left, 200],
+    [right, W - 210],
+  ] as const) {
+    if (!f) continue;
+    page.drawLine({ start: { x: cx - 90, y: 96 }, end: { x: cx + 90, y: 96 }, thickness: 0.8, color: INK });
+    const nameText = latin(f.name);
+    page.drawText(nameText, { x: cx - serifItalic.widthOfTextAtSize(nameText, 15) / 2, y: 104, size: 15, font: serifItalic, color: INK });
+    const roleText = latin(`${f.role}, ${site.organiser}`);
+    page.drawText(roleText, { x: cx - sans.widthOfTextAtSize(roleText, 9) / 2, y: 82, size: 9, font: sans, color: MUTED });
+  }
 
   // Verification QR
   const verifyUrl = `${site.url}/verify?cert=${encodeURIComponent(c.certNo)}`;

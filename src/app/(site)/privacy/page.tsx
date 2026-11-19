@@ -6,15 +6,15 @@ export const metadata: Metadata = { title: "Privacy policy" };
 
 export default function PrivacyPage() {
   return (
-    <ProsePage eyebrow="Policies" title="Privacy policy" updated="18 November 2026">
+    <ProsePage eyebrow="Policies" title="Privacy policy" updated="19 November 2026">
       <p>
         {site.organiser} (&ldquo;we&rdquo;) runs the {site.name}. Most participants are children, so we collect as little as possible and only
         with a parent&apos;s or guardian&apos;s consent.
       </p>
       <h2>What we collect</h2>
       <ul>
-        <li>Student: name, date of birth, optional gender, optional school/academy, chosen level.</li>
-        <li>Parent/guardian: name, mobile number, optional email, city and state.</li>
+        <li>Student: name, date of birth, optional gender, optional school/academy, and school class.</li>
+        <li>Parent/guardian: name, mobile number, email, city and state.</li>
         <li>Payment: the UPI transaction reference you enter. We never see or store card, bank or UPI PIN details.</li>
         <li>Exam: answers, timing, and how often the exam screen was left.</li>
       </ul>
@@ -22,7 +22,10 @@ export default function PrivacyPage() {
       <ul>
         <li>To register the student, verify payment, place them in the right category, conduct the exam and publish results.</li>
         <li>To issue certificates and let anyone verify them.</li>
-        <li>To contact the parent about this competition. We do not send marketing without separate permission.</li>
+        <li>
+          To email the parent about this competition: the registration number, payment confirmation, exam confirmation, results and PIN resets. We
+          do not send marketing without separate permission.
+        </li>
       </ul>
       <h2>What is public</h2>
       <p>
@@ -30,7 +33,10 @@ export default function PrivacyPage() {
         certificate verification page shows the full name, city, award and score for a certificate number.
       </p>
       <h2>Sharing</h2>
-      <p>We do not sell or rent personal data. Data is stored with our hosting and database providers only to run this website.</p>
+      <p>
+        We do not sell or rent personal data. Data is stored on our own server, and emails are delivered through our email provider (Resend), only
+        to run this competition.
+      </p>
       <h2>Retention</h2>
       <p>
         We keep registration and exam data until 30 June 2027 to handle queries and certificate verification, then delete it — except winners&apos;

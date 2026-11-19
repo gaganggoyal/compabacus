@@ -1,12 +1,11 @@
 import "server-only";
 import { and, eq, inArray, isNotNull, ne, or } from "drizzle-orm";
-import { times } from "./config";
+import { site, times } from "./config";
 import { randomCode } from "./crypto";
 import { db, schema } from "./db";
 import type { Award } from "./db/schema";
 import { finalizeExpiredAttempts } from "./exam/server";
 import { getResultsMode, getSetting, setSetting } from "./settings";
-import { site } from "./config";
 
 export type RankedRow = {
   attemptId: string;
@@ -15,8 +14,7 @@ export type RankedRow = {
   city: string;
   state: string;
   school: string | null;
-  ageGroup: string;
-  level: string;
+  grade: string;
   score: number;
   maxScore: number;
   timeTakenMs: number;
@@ -36,7 +34,7 @@ function awardFor(rank: number, score: number, max: number): Award {
 }
 
 /**
- * Ranks every submitted attempt whose payment is verified, per category (age group × level).
+ * Ranks every submitted attempt whose payment is verified, separately for each class.
  * Order: score desc, then time taken asc, then submission time asc. Idempotent.
  */
 export async function computeResults() {
@@ -46,8 +44,7 @@ export async function computeResults() {
   const rows = await db
     .select({
       id: schema.attempts.id,
-      ageGroup: schema.attempts.ageGroup,
-      level: schema.attempts.level,
+      grade: schema.attempts.grade,
       score: schema.attempts.score,
       maxScore: schema.attempts.maxScore,
       timeTakenMs: schema.attempts.timeTakenMs,
@@ -60,7 +57,7 @@ export async function computeResults() {
 
   const byCat = new Map<string, typeof rows>();
   for (const r of rows) {
-    const k = `${r.ageGroup}|${r.level}`;
+    const k = r.grade;
     if (!byCat.has(k)) byCat.set(k, []);
     byCat.get(k)!.push(r);
   }
@@ -135,8 +132,7 @@ export async function rankedResults(): Promise<RankedRow[]> {
       city: schema.registrations.city,
       state: schema.registrations.state,
       school: schema.registrations.school,
-      ageGroup: schema.attempts.ageGroup,
-      level: schema.attempts.level,
+      grade: schema.attempts.grade,
       score: schema.attempts.score,
       maxScore: schema.attempts.maxScore,
       timeTakenMs: schema.attempts.timeTakenMs,
@@ -168,8 +164,7 @@ export async function certificateByNo(certNo: string) {
       rank: schema.attempts.rank,
       score: schema.attempts.score,
       maxScore: schema.attempts.maxScore,
-      ageGroup: schema.attempts.ageGroup,
-      level: schema.attempts.level,
+      grade: schema.attempts.grade,
       status: schema.attempts.status,
       studentName: schema.registrations.studentName,
       school: schema.registrations.school,

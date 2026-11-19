@@ -35,7 +35,7 @@ export default function RegisterPage() {
                 <CalendarDays className="h-5 w-5 shrink-0 text-amber-300" /> One timed exam attempt, any day 1–31 December
               </li>
               <li className="flex gap-3">
-                <Trophy className="h-5 w-5 shrink-0 text-amber-300" /> Ranking in your own age group & level
+                <Trophy className="h-5 w-5 shrink-0 text-amber-300" /> Ranking within your own class
               </li>
               <li className="flex gap-3">
                 <BadgeCheck className="h-5 w-5 shrink-0 text-amber-300" /> QR-verified e-certificate

@@ -8,8 +8,8 @@ import { LogoMark } from "@/components/brand";
 import { PrintButton } from "@/components/copy-button";
 import { PageLoading, btn } from "@/components/ui";
 import { currentStudent } from "@/lib/auth";
-import { ageGroupById, site, times } from "@/lib/config";
-import { levelById, totalQuestions } from "@/lib/exam/levels";
+import { site, times } from "@/lib/config";
+import { gradeById, totalQuestions } from "@/lib/exam/papers";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Admit card" };
@@ -25,8 +25,7 @@ export default function AdmitCardPage() {
 async function AdmitCard() {
   const reg = await currentStudent();
   if (!reg) redirect("/login?next=/dashboard/admit-card");
-  const level = levelById(reg.level);
-  const group = ageGroupById(reg.ageGroup);
+  const grade = gradeById(reg.grade);
   const qr = await QRCode.toDataURL(`${site.url}/login`, { margin: 1, width: 240 });
 
   return (
@@ -57,9 +56,8 @@ async function AdmitCard() {
                 ["Student name", reg.studentName],
                 ["Registration no.", reg.regNo],
                 ["Date of birth", fmtDate(reg.dob)],
-                ["Age group", `Group ${group?.id} · ${group?.label}`],
-                ["Level", `${level?.name} (${reg.level})`],
-                ["Paper", `${level ? totalQuestions(level) : "?"} questions · ${level ? level.durationSec / 60 : "?"} min`],
+                ["Class", grade?.label ?? reg.grade],
+                ["Paper", `${grade ? totalQuestions(grade.paper) : "?"} multiple-choice questions · ${grade ? grade.paper.durationSec / 60 : "?"} min`],
                 ["School / academy", reg.school ?? "—"],
                 ["City", `${reg.city}, ${reg.state}`],
               ].map(([k, v]) => (
@@ -84,6 +82,7 @@ async function AdmitCard() {
             <ol className="mt-1 list-decimal space-y-1 pl-5 text-ink/70">
               <li>Log in at {site.url.replace(/^https?:\/\//, "")}/login with your Registration No. and PIN.</li>
               <li>Use a laptop, tablet or phone with stable internet. Keep the device charged.</li>
+              <li>Every question is multiple choice: tap one of four options. No negative marking.</li>
               <li>A physical abacus is allowed for written sections. The Flash Round must be done mentally.</li>
               <li>Calculators, other apps, and help from anyone are not allowed. Leaving the exam screen is recorded.</li>
               <li>Answers save automatically. If disconnected, log in again quickly — the timer keeps running.</li>

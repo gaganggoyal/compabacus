@@ -2,7 +2,8 @@ import "server-only";
 import { and, eq, lt } from "drizzle-orm";
 import { db, schema } from "../db";
 import type { Attempt } from "../db/schema";
-import { type Answers, type Paper, allQuestionIds, scorePaper } from "./generator";
+import { notifyExamSubmitted } from "../email/notify";
+import { type Answers, type Paper, normaliseAnswer, scorePaper } from "./generator";
 
 /** Grace period after the deadline for the final autosave/submit to arrive. */
 export const SUBMIT_GRACE_MS = 15_000;
@@ -20,15 +21,16 @@ export function parseAnswers(a: Pick<Attempt, "answers">): Answers {
   }
 }
 
-/** Keep only known question ids with short numeric-ish values. */
+/** Keep only answers to known questions that are one of that question's options. */
 export function sanitiseAnswers(paper: Paper, raw: unknown): Answers {
   const out: Answers = {};
   if (!raw || typeof raw !== "object") return out;
-  const ids = new Set(allQuestionIds(paper));
+  const options = new Map(paper.sections.flatMap((s) => s.questions.map((q) => [q.id, q.options] as const)));
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!ids.has(k) || typeof v !== "string") continue;
-    const t = v.trim().slice(0, 14);
-    if (t && /^-?[\d,\s]*$/.test(t)) out[k] = t;
+    const opts = options.get(k);
+    if (!opts || typeof v !== "string") continue;
+    const n = normaliseAnswer(v);
+    if (n !== null && opts.includes(n)) out[k] = String(n);
   }
   return out;
 }
@@ -39,7 +41,7 @@ export async function finalizeAttempt(attempt: Attempt, answers: Answers, focusL
   const deadline = attempt.deadlineAt.getTime();
   const submittedAt = Math.min(now, deadline);
   const losses = Math.max(attempt.focusLosses, focusLosses);
-  await db
+  const res = await db
     .update(schema.attempts)
     .set({
       answers: JSON.stringify(answers),
@@ -53,6 +55,8 @@ export async function finalizeAttempt(attempt: Attempt, answers: Answers, focusL
       flagged: attempt.flagged || losses >= FLAG_FOCUS_LOSSES,
     })
     .where(and(eq(schema.attempts.id, attempt.id), eq(schema.attempts.status, "in_progress")));
+  // Only the request that actually closed the attempt sends the confirmation.
+  if (res.rowsAffected) notifyExamSubmitted(attempt.registrationId, attempt.id, new Date(submittedAt));
   return { score, max };
 }
 

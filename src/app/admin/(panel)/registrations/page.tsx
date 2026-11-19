@@ -4,10 +4,9 @@ import { Suspense } from "react";
 import { PaymentActions, ResetPinButton } from "@/components/admin/admin-forms";
 import { Badge, PageLoading, cn, inputCls } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
-import { AGE_GROUPS } from "@/lib/config";
 import { db, schema } from "@/lib/db";
 import { PAYMENT_STATUSES } from "@/lib/db/schema";
-import { LEVELS } from "@/lib/exam/levels";
+import { GRADES, gradeLabel } from "@/lib/exam/papers";
 import { fmtDateTime } from "@/lib/format";
 
 const PAGE = 50;
@@ -30,8 +29,7 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
   const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : "");
   const q = str("q").trim();
   const pay = str("pay");
-  const group = str("group");
-  const level = str("level");
+  const grade = str("grade");
   const page = Math.max(1, Number(str("page")) || 1);
 
   const where: SQL[] = [];
@@ -44,13 +42,13 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
         like(schema.registrations.phone, p),
         like(schema.registrations.city, p),
         like(schema.registrations.parentName, p),
+        like(schema.registrations.email, p),
         like(schema.registrations.utr, p),
       )!,
     );
   }
   if ((PAYMENT_STATUSES as readonly string[]).includes(pay)) where.push(eq(schema.registrations.paymentStatus, pay as (typeof PAYMENT_STATUSES)[number]));
-  if (group) where.push(eq(schema.registrations.ageGroup, group));
-  if (level) where.push(eq(schema.registrations.level, level));
+  if (grade) where.push(eq(schema.registrations.grade, grade));
   const cond = where.length ? and(...where) : undefined;
 
   const [{ n }] = await db.select({ n: count() }).from(schema.registrations).where(cond);
@@ -63,7 +61,7 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
     .offset((page - 1) * PAGE);
   const pages = Math.max(1, Math.ceil(n / PAGE));
   const qs = (p: number) => {
-    const u = new URLSearchParams({ q, pay, group, level, page: String(p) });
+    const u = new URLSearchParams({ q, pay, grade, page: String(p) });
     return `/admin/registrations?${u.toString()}`;
   };
 
@@ -73,8 +71,8 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
         <h1 className="font-display text-3xl font-bold">Registrations</h1>
         <p className="text-sm text-ink/55">{n} found</p>
       </div>
-      <form className="grid gap-2 rounded-2xl bg-white p-3 ring-1 ring-ink/8 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
-        <input name="q" defaultValue={q} placeholder="Search name, reg no, phone, city, UTR…" className={inputCls} />
+      <form className="grid gap-2 rounded-2xl bg-white p-3 ring-1 ring-ink/8 sm:grid-cols-[2fr_1fr_1fr_auto]">
+        <input name="q" defaultValue={q} placeholder="Search name, reg no, phone, email, city, UTR…" className={inputCls} />
         <select name="pay" defaultValue={pay} className={inputCls}>
           <option value="">Any payment</option>
           {PAYMENT_STATUSES.map((s) => (
@@ -83,19 +81,11 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
             </option>
           ))}
         </select>
-        <select name="group" defaultValue={group} className={inputCls}>
-          <option value="">Any group</option>
-          {AGE_GROUPS.map((g) => (
+        <select name="grade" defaultValue={grade} className={inputCls}>
+          <option value="">Any class</option>
+          {GRADES.map((g) => (
             <option key={g.id} value={g.id}>
-              Group {g.id} ({g.min}–{g.max})
-            </option>
-          ))}
-        </select>
-        <select name="level" defaultValue={level} className={inputCls}>
-          <option value="">Any level</option>
-          {LEVELS.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.id} {l.name}
+              {g.label}
             </option>
           ))}
         </select>
@@ -110,7 +100,7 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
             <tr>
               <th className="px-4 py-3">Reg no.</th>
               <th className="px-4 py-3">Student</th>
-              <th className="px-4 py-3">Category</th>
+              <th className="px-4 py-3">Class</th>
               <th className="px-4 py-3">Parent</th>
               <th className="px-4 py-3">Payment</th>
               <th className="px-4 py-3">Registered</th>
@@ -128,9 +118,7 @@ async function Registrations({ searchParams }: { searchParams: PageProps<"/admin
                   </p>
                   {r.school && <p className="text-xs text-ink/40">{r.school}</p>}
                 </td>
-                <td className="px-4 py-3 text-xs">
-                  Group {r.ageGroup} · {r.level}
-                </td>
+                <td className="px-4 py-3 text-xs font-semibold">{gradeLabel(r.grade)}</td>
                 <td className="px-4 py-3 text-xs">
                   <p>{r.parentName}</p>
                   <a href={`https://wa.me/${r.phone.startsWith("+") ? r.phone.slice(1) : `91${r.phone}`}`} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">

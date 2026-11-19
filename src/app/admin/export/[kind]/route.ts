@@ -1,5 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
+import { GRADES, gradeLabel } from "@/lib/exam/papers";
 import { AWARD_META } from "@/lib/format";
 import { isAdmin } from "@/lib/session";
 
@@ -26,14 +27,13 @@ export async function GET(_req: Request, ctx: RouteContext<"/admin/export/[kind]
   if (kind === "registrations") {
     const rows = await db.select().from(schema.registrations).orderBy(desc(schema.registrations.createdAt));
     body = csv([
-      ["reg_no", "student", "dob", "gender", "age_group", "level", "school", "parent", "phone", "email", "city", "state", "country", "payment", "utr", "registered_at"],
+      ["reg_no", "student", "dob", "gender", "class", "school", "parent", "phone", "email", "city", "state", "country", "payment", "utr", "registered_at"],
       ...rows.map((r) => [
         r.regNo,
         r.studentName,
         r.dob,
         r.gender,
-        r.ageGroup,
-        r.level,
+        gradeLabel(r.grade),
         r.school,
         r.parentName,
         r.phone,
@@ -51,12 +51,12 @@ export async function GET(_req: Request, ctx: RouteContext<"/admin/export/[kind]
       .select({ a: schema.attempts, r: schema.registrations })
       .from(schema.attempts)
       .innerJoin(schema.registrations, eq(schema.registrations.id, schema.attempts.registrationId));
-    rows.sort((x, y) => (x.a.ageGroup + x.a.level).localeCompare(y.a.ageGroup + y.a.level) || (x.a.rank ?? 1e9) - (y.a.rank ?? 1e9));
+    const order = (id: string) => GRADES.findIndex((g) => g.id === id);
+    rows.sort((x, y) => order(x.a.grade) - order(y.a.grade) || (x.a.rank ?? 1e9) - (y.a.rank ?? 1e9));
     body = csv([
-      ["age_group", "level", "rank", "award", "student", "reg_no", "city", "state", "phone", "score", "max", "time_sec", "screen_exits", "status", "payment", "cert_no"],
+      ["class", "rank", "award", "student", "reg_no", "city", "state", "phone", "score", "max", "time_sec", "screen_exits", "status", "payment", "cert_no"],
       ...rows.map(({ a, r }) => [
-        a.ageGroup,
-        a.level,
+        gradeLabel(a.grade),
         a.rank,
         a.award ? AWARD_META[a.award].label : "",
         r.studentName,

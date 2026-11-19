@@ -5,18 +5,20 @@ import Link from "next/link";
 import { useActionState, useState, startTransition } from "react";
 import { type FormState, registerAction } from "@/app/actions/student";
 import { Field, btn, cn, inputCls } from "@/components/ui";
-import { INDIAN_STATES, ageGroupFor, ageOn } from "@/lib/config";
-import { LEVELS } from "@/lib/exam/levels";
+import { INDIAN_STATES, MAX_AGE, MIN_AGE, ageOn } from "@/lib/config";
+import { GRADES, STAGES, gradeById, totalQuestions } from "@/lib/exam/papers";
 
 export function RegisterForm() {
   const [state, action, pending] = useActionState<FormState, FormData>(registerAction, {});
   const [dob, setDob] = useState("");
-  const [level, setLevel] = useState("");
+  const [grade, setGrade] = useState("");
   const [stateName, setStateName] = useState("");
   const e = state.errors ?? {};
 
-  const group = /^\d{4}-\d{2}-\d{2}$/.test(dob) ? ageGroupFor(dob) : null;
   const age = /^\d{4}-\d{2}-\d{2}$/.test(dob) ? ageOn(dob) : null;
+  const ageOk = age !== null && age >= MIN_AGE && age <= MAX_AGE;
+  const chosen = gradeById(grade);
+  const classMismatch = chosen && ageOk && (age < chosen.ages[0] || age > chosen.ages[1]);
 
   return (
     <form
@@ -41,7 +43,7 @@ export function RegisterForm() {
           <Field label="Student's full name" error={e.studentName} hint="Printed exactly like this on the certificate" className="sm:col-span-2">
             <input name="studentName" autoComplete="off" className={inputCls} aria-invalid={!!e.studentName} placeholder="e.g. Aarav Sharma" />
           </Field>
-          <Field label="Date of birth" error={e.dob} hint={group ? undefined : "Age is counted as on 1 Dec 2026"}>
+          <Field label="Date of birth" error={e.dob} hint={ageOk ? undefined : "Age is counted as on 1 Dec 2026"}>
             <input
               type="date"
               name="dob"
@@ -52,12 +54,16 @@ export function RegisterForm() {
               className={inputCls}
               aria-invalid={!!e.dob}
             />
-            {group && (
+            {ageOk && !e.dob && (
               <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                <Check className="h-3.5 w-3.5" /> Age {age} → Group {group.id} · {group.label}
+                <Check className="h-3.5 w-3.5" /> Age {age} on 1 Dec 2026
               </span>
             )}
-            {!group && age !== null && !e.dob && <span className="mt-1.5 block text-xs font-semibold text-rose-600">Age {age} is outside 4–18</span>}
+            {!ageOk && age !== null && !e.dob && (
+              <span className="mt-1.5 block text-xs font-semibold text-rose-600">
+                Age {age} is outside {MIN_AGE}–{MAX_AGE}
+              </span>
+            )}
           </Field>
           <Field label="Gender (optional)">
             <select name="gender" defaultValue="" className={inputCls}>
@@ -74,41 +80,54 @@ export function RegisterForm() {
       </fieldset>
 
       <fieldset>
-        <legend className="font-display text-xl font-bold">Competition level</legend>
+        <legend className="font-display text-xl font-bold">Class</legend>
         <p className="mt-1 text-sm text-ink/60">
-          Choose what your child has learnt so far. Not sure?{" "}
+          Your child&apos;s school class in the current session. Every class gets its own paper and its own ranking.{" "}
           <Link href="/practice" target="_blank" className="font-semibold text-indigo-600 underline-offset-2 hover:underline">
-            Try a free mock test
+            See a free mock test
           </Link>
           .
         </p>
-        {e.level && <p className="mt-2 text-sm font-medium text-rose-600">{e.level}</p>}
-        <input type="hidden" name="level" value={level} />
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {LEVELS.map((l) => (
-            <button
-              type="button"
-              key={l.id}
-              onClick={() => setLevel(l.id)}
-              aria-pressed={level === l.id}
-              className={cn(
-                "relative rounded-2xl bg-white p-4 text-left ring-1 transition",
-                level === l.id ? "ring-2 ring-indigo-600 shadow-lg shadow-indigo-600/10" : "ring-ink/12 hover:ring-ink/30",
-              )}
-            >
-              {level === l.id && (
-                <span className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-indigo-600 text-white">
-                  <Check className="h-3.5 w-3.5" />
-                </span>
-              )}
-              <p className="font-display font-bold">
-                {l.name} <span className="text-xs font-semibold text-ink/40">{l.id}</span>
-              </p>
-              <p className="mt-0.5 text-sm text-ink/70">{l.short}</p>
-              <p className="mt-1 text-xs text-ink/45">{l.suitedFor}</p>
-            </button>
+        {e.grade && <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{e.grade}</p>}
+        <input type="hidden" name="grade" value={grade} />
+        <div className="mt-4 space-y-4">
+          {STAGES.map((st) => (
+            <div key={st.id}>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink/40">{st.label}</p>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {GRADES.filter((g) => g.stage === st.id).map((g) => (
+                  <button
+                    type="button"
+                    key={g.id}
+                    onClick={() => setGrade(g.id)}
+                    aria-pressed={grade === g.id}
+                    className={cn(
+                      "rounded-xl px-2 py-2.5 text-center text-sm font-bold ring-1 transition",
+                      grade === g.id ? "bg-indigo-600 text-white ring-indigo-600 shadow-md shadow-indigo-600/20" : "bg-white text-ink ring-ink/12 hover:ring-ink/30",
+                    )}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
+        {chosen && (
+          <div className={cn("mt-4 rounded-2xl px-4 py-3 text-sm", classMismatch ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "bg-indigo-50/70 text-ink/75")}>
+            {classMismatch ? (
+              <>
+                <b>{chosen.label}</b> is for children aged {chosen.ages[0]}–{chosen.ages[1]} on 1 Dec 2026, but the date of birth gives age {age}.
+                Please check both.
+              </>
+            ) : (
+              <>
+                <b className="text-ink">{chosen.label} paper:</b> {chosen.summary} · {totalQuestions(chosen.paper)} multiple-choice questions ·{" "}
+                {chosen.paper.durationSec / 60} minutes
+              </>
+            )}
+          </div>
+        )}
       </fieldset>
 
       <fieldset>
@@ -120,8 +139,8 @@ export function RegisterForm() {
           <Field label="Mobile number (WhatsApp preferred)" error={e.phone}>
             <input name="phone" type="tel" inputMode="tel" autoComplete="tel" className={inputCls} aria-invalid={!!e.phone} placeholder="98XXXXXXXX" />
           </Field>
-          <Field label="Email (optional)" error={e.email}>
-            <input name="email" type="email" autoComplete="email" className={inputCls} aria-invalid={!!e.email} />
+          <Field label="Parent email" error={e.email} hint="We email the registration number, payment confirmation and results">
+            <input name="email" type="email" inputMode="email" autoComplete="email" className={inputCls} aria-invalid={!!e.email} placeholder="name@gmail.com" />
           </Field>
           <Field label="City / town" error={e.city}>
             <input name="city" autoComplete="address-level2" className={inputCls} aria-invalid={!!e.city} />

@@ -7,7 +7,7 @@ import { examTestMode, times } from "@/lib/config";
 import { newId, randomSeed } from "@/lib/crypto";
 import { db, schema } from "@/lib/db";
 import { generatePaper } from "@/lib/exam/generator";
-import { levelById } from "@/lib/exam/levels";
+import { gradeById } from "@/lib/exam/papers";
 import {
   FLAG_FOCUS_LOSSES,
   SUBMIT_GRACE_MS,
@@ -33,20 +33,19 @@ export async function startExamAction(): Promise<{ error?: string }> {
     refresh();
     return {};
   }
-  const level = levelById(reg.level);
-  if (!level) return { error: "Unknown level. Please contact support." };
+  const grade = gradeById(reg.grade);
+  if (!grade) return { error: "Unknown class. Please contact support." };
   const seed = randomSeed();
-  const paper = generatePaper(level, seed);
+  const paper = generatePaper(grade.id, grade.paper, seed);
   try {
     await db.insert(schema.attempts).values({
       id: newId(),
       registrationId: reg.id,
-      level: reg.level,
-      ageGroup: reg.ageGroup,
+      grade: reg.grade,
       seed,
       paper: JSON.stringify(paper),
       startedAt: new Date(now),
-      deadlineAt: new Date(now + level.durationSec * 1000),
+      deadlineAt: new Date(now + grade.paper.durationSec * 1000),
     });
   } catch {
     // Unique constraint: a parallel click already created the attempt.

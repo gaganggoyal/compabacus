@@ -5,14 +5,14 @@ import { requestNow } from "@/lib/now";
 import { Suspense } from "react";
 import { Countdown } from "@/components/countdown";
 import { Card, PageLoading, cn } from "@/components/ui";
-import { AGE_GROUPS, times } from "@/lib/config";
-import { LEVELS } from "@/lib/exam/levels";
+import { times } from "@/lib/config";
+import { GRADES, STAGES } from "@/lib/exam/papers";
 import { fmtDateTime, fmtDuration, publicName } from "@/lib/format";
 import { type RankedRow, rankedResults, resultsLive } from "@/lib/results";
 
 export const metadata: Metadata = {
   title: "Results & Hall of Fame",
-  description: "Champions and runners-up of every age group and level.",
+  description: "Champions and runners-up of every class, Nursery to Class 12.",
 };
 
 export default function ResultsPage({ searchParams }: PageProps<"/results">) {
@@ -44,10 +44,11 @@ async function Results({ searchParams }: { searchParams: PageProps<"/results">["
   }
 
   const sp = await searchParams;
-  const groupId = typeof sp.group === "string" && AGE_GROUPS.some((g) => g.id === sp.group) ? sp.group : AGE_GROUPS[0].id;
+  const stageId = typeof sp.stage === "string" && STAGES.some((s) => s.id === sp.stage) ? sp.stage : STAGES[0].id;
   const rows = await rankedResults();
-  const group = AGE_GROUPS.find((g) => g.id === groupId)!;
-  const inGroup = rows.filter((r) => r.ageGroup === groupId);
+  const stage = STAGES.find((s) => s.id === stageId)!;
+  const grades = GRADES.filter((g) => g.stage === stageId);
+  const inStage = rows.filter((r) => grades.some((g) => g.id === r.grade));
   const champions = rows.filter((r) => r.award === "champion").length;
 
   return (
@@ -64,7 +65,7 @@ async function Results({ searchParams }: { searchParams: PageProps<"/results">["
             {[
               { icon: Users, k: rows.length, v: "ranked students" },
               { icon: Crown, k: champions, v: "champions" },
-              { icon: Medal, k: new Set(rows.map((r) => `${r.ageGroup}${r.level}`)).size, v: "categories" },
+              { icon: Medal, k: new Set(rows.map((r) => r.grade)).size, v: "classes" },
             ].map((s) => (
               <div key={s.v} className="rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10">
                 <s.icon className="mx-auto h-5 w-5 text-amber-300" />
@@ -77,33 +78,33 @@ async function Results({ searchParams }: { searchParams: PageProps<"/results">["
       </section>
 
       <div className="container-x py-12">
-        <nav className="flex gap-2 overflow-x-auto pb-2" aria-label="Age groups">
-          {AGE_GROUPS.map((g) => (
+        <nav className="flex gap-2 overflow-x-auto pb-2" aria-label="School stages">
+          {STAGES.map((s) => (
             <Link
-              key={g.id}
-              href={`/results?group=${g.id}`}
+              key={s.id}
+              href={`/results?stage=${s.id}`}
               scroll={false}
               className={cn(
                 "shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition",
-                g.id === groupId ? "bg-ink text-white" : "bg-white text-ink/70 ring-1 ring-ink/10 hover:ring-ink/25",
+                s.id === stageId ? "bg-ink text-white" : "bg-white text-ink/70 ring-1 ring-ink/10 hover:ring-ink/25",
               )}
             >
-              Group {g.id} · {g.min}–{g.max} yrs
+              {s.label} · {s.short}
             </Link>
           ))}
         </nav>
 
         <h2 className="mt-8 font-display text-2xl font-bold">
-          Group {group.id} — {group.label}
+          {stage.label} — {stage.short}
         </h2>
 
         <div className="mt-6 space-y-6">
-          {LEVELS.map((l) => {
-            const list = inGroup.filter((r) => r.level === l.id);
+          {grades.map((g) => {
+            const list = inStage.filter((r) => r.grade === g.id);
             if (!list.length) return null;
-            return <CategoryBlock key={l.id} title={`${l.name} (${l.id})`} rows={list} />;
+            return <CategoryBlock key={g.id} title={g.label} rows={list} />;
           })}
-          {!inGroup.length && <p className="rounded-3xl bg-white p-8 text-center text-ink/50 ring-1 ring-ink/8">No ranked students in this group.</p>}
+          {!inStage.length && <p className="rounded-3xl bg-white p-8 text-center text-ink/50 ring-1 ring-ink/8">No ranked students in these classes.</p>}
         </div>
 
         <p className="mt-10 text-center text-sm text-ink/50">

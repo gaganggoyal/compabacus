@@ -1,12 +1,15 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { assertAdmin } from "@/lib/auth";
 import { hashSecret, randomDigits, safeEqual } from "@/lib/crypto";
 import { db, schema } from "@/lib/db";
-import { computeResults } from "@/lib/results";
+import { notifyRegistrations, pendingResultEmails, sendResultEmails } from "@/lib/email/notify";
+import { EMAIL_RE, deliver, emailSettings } from "@/lib/email/send";
+import { testEmail } from "@/lib/email/templates";
+import { computeResults, resultsLive } from "@/lib/results";
 import { clearAdminSession, setAdminSession } from "@/lib/session";
 import { type ResultsMode, setSetting } from "@/lib/settings";
 
@@ -30,16 +33,18 @@ export async function adminLogoutAction() {
 
 export async function verifyPaymentAction(registrationId: string) {
   await assertAdmin();
-  await db
+  const changed = await db
     .update(schema.registrations)
     .set({ paymentStatus: "verified", paymentVerifiedAt: new Date(), paymentNote: null })
-    .where(eq(schema.registrations.id, registrationId));
+    .where(and(eq(schema.registrations.id, registrationId), ne(schema.registrations.paymentStatus, "verified")))
+    .returning({ id: schema.registrations.id });
+  notifyRegistrations("payment_verified", changed.map((c) => c.id));
   refresh();
 }
 
 export async function rejectPaymentAction(registrationId: string, note: string) {
   await assertAdmin();
-  await db
+  const changed = await db
     .update(schema.registrations)
     .set({
       paymentStatus: "rejected",
@@ -47,17 +52,21 @@ export async function rejectPaymentAction(registrationId: string, note: string) 
       paymentNote: note.trim().slice(0, 200) || "We could not find this transaction. Please check the UTR and re-submit.",
       utr: null,
     })
-    .where(eq(schema.registrations.id, registrationId));
+    .where(and(eq(schema.registrations.id, registrationId), ne(schema.registrations.paymentStatus, "rejected")))
+    .returning({ id: schema.registrations.id });
+  notifyRegistrations("payment_rejected", changed.map((c) => c.id));
   refresh();
 }
 
 /** Mark as paid without a UTR — e.g. cash collected at a school. */
 export async function markPaidManuallyAction(registrationId: string) {
   await assertAdmin();
-  await db
+  const changed = await db
     .update(schema.registrations)
     .set({ paymentStatus: "verified", paymentVerifiedAt: new Date(), paymentNote: "Marked paid by admin" })
-    .where(eq(schema.registrations.id, registrationId));
+    .where(and(eq(schema.registrations.id, registrationId), ne(schema.registrations.paymentStatus, "verified")))
+    .returning({ id: schema.registrations.id });
+  notifyRegistrations("payment_verified", changed.map((c) => c.id));
   refresh();
 }
 
@@ -83,6 +92,7 @@ export async function bulkVerifyAction(_prev: BulkState, formData: FormData): Pr
           pending.map((p) => p.id),
         ),
       );
+    notifyRegistrations("payment_verified", pending.map((p) => p.id));
   }
   const matched = new Set(pending.map((p) => p.utr));
   refresh();
@@ -139,4 +149,30 @@ export async function setResultsModeAction(mode: ResultsMode) {
   await setSetting("results_mode", mode);
   if (mode === "published") await computeResults();
   refresh();
+}
+
+export type EmailActionState = { ok?: boolean; message?: string };
+
+export async function sendTestEmailAction(_prev: EmailActionState, formData: FormData): Promise<EmailActionState> {
+  await assertAdmin();
+  const to = String(formData.get("to") ?? "").trim();
+  if (!EMAIL_RE.test(to)) return { message: "Enter a valid email address." };
+  const ok = await deliver("test", testEmail(to));
+  refresh();
+  if (ok) return { ok: true, message: `Sent to ${to}. Check the inbox and the spam folder.` };
+  return {
+    message: emailSettings().enabled
+      ? "Sending failed. The reason is in the log below."
+      : "Email isn't switched on yet (RESEND_API_KEY is not set), so the test was only logged.",
+  };
+}
+
+/** Emails every ranked student's parent their result and certificate link. Safe to click again: already-emailed families are skipped. */
+export async function sendResultEmailsAction(): Promise<EmailActionState> {
+  await assertAdmin();
+  if (!(await resultsLive(Date.now()))) return { message: "Publish the results first, then send the emails." };
+  const queue = await pendingResultEmails();
+  if (!queue.length) return { ok: true, message: "Every ranked student with an email has already been sent their result." };
+  sendResultEmails(queue);
+  return { ok: true, message: `Sending ${queue.length} result emails in the background. Refresh this page in a minute to see progress.` };
 }

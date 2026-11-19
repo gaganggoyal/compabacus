@@ -7,6 +7,7 @@ import { Badge, PageLoading, cn } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { finalizeExpiredAttempts } from "@/lib/exam/server";
+import { gradeLabel } from "@/lib/exam/papers";
 import { fmtDateTime, fmtDuration } from "@/lib/format";
 
 export default function AttemptsPage({ searchParams }: PageProps<"/admin/attempts">) {
@@ -46,8 +47,7 @@ async function Attempts({ searchParams }: { searchParams: PageProps<"/admin/atte
       flagged: schema.attempts.flagged,
       startedAt: schema.attempts.startedAt,
       adminNote: schema.attempts.adminNote,
-      level: schema.attempts.level,
-      ageGroup: schema.attempts.ageGroup,
+      grade: schema.attempts.grade,
       studentName: schema.registrations.studentName,
       regNo: schema.registrations.regNo,
       paymentStatus: schema.registrations.paymentStatus,
@@ -82,7 +82,7 @@ async function Attempts({ searchParams }: { searchParams: PageProps<"/admin/atte
           <thead className="border-b border-ink/8 text-xs uppercase tracking-wider text-ink/45">
             <tr>
               <th className="px-4 py-3">Student</th>
-              <th className="px-4 py-3">Category</th>
+              <th className="px-4 py-3">Class</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Score</th>
               <th className="px-4 py-3 text-right">Time</th>
@@ -101,7 +101,7 @@ async function Attempts({ searchParams }: { searchParams: PageProps<"/admin/atte
                   </p>
                 </td>
                 <td className="px-4 py-3 text-xs">
-                  {r.ageGroup} · {r.level}
+                  {gradeLabel(r.grade)}
                 </td>
                 <td className="px-4 py-3">
                   <Badge tone={r.status === "submitted" ? "emerald" : r.status === "in_progress" ? "sky" : "rose"}>{r.status.replace("_", " ")}</Badge>

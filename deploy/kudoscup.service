@@ -1,0 +1,62 @@
+; systemd unit for the Kudos Cup Abacus Championship (https://kudoscup.com)
+;
+;   sudo cp deploy/kudoscup.service /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now kudoscup
+;   journalctl -u kudoscup -f
+;
+; Same pattern as the other apps on this VPS: the Next.js server runs on the
+; host and Caddy (in Docker) reverse-proxies to it over the bridge gateway
+; (172.18.0.1:3400). See deploy/Caddyfile.snippet.
+;
+; Secrets live in /var/www/kudoscup/.env.production.local (chmod 600, owned by
+; the kudoscup user), never in this file: unit files are world-readable.
+
+[Unit]
+Description=Kudos Cup Abacus Championship (kudoscup.com)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+; useradd --system --home /var/www/kudoscup --shell /usr/sbin/nologin kudoscup
+User=kudoscup
+Group=kudoscup
+WorkingDirectory=/var/www/kudoscup
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3400
+
+KillSignal=SIGTERM
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kudoscup
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+; The SQLite database (+ WAL files) lives in /var/lib/kudoscup; Next.js writes
+; its runtime cache under .next/cache.
+ReadWritePaths=/var/lib/kudoscup /var/www/kudoscup/.next/cache
+
+[Install]
+WantedBy=multi-user.target

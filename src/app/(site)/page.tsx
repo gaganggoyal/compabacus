@@ -22,14 +22,18 @@ import Link from "next/link";
 import { AbacusArt, WhatsAppIcon, whatsappLink } from "@/components/brand";
 import { Countdown, PhaseCta } from "@/components/countdown";
 import { Badge, Card, SectionTitle, btn, cn } from "@/components/ui";
-import { AGE_GROUPS, prizes, site } from "@/lib/config";
-import { LEVELS, totalQuestions } from "@/lib/exam/levels";
+import { prizes, site } from "@/lib/config";
+import { DURATION_MINUTES, GRADES, STAGES, totalQuestions } from "@/lib/exam/papers";
 
 const STEPS = [
   { icon: Sparkles, title: "Register in 2 minutes", text: "Parent fills one simple form and sets a 6-digit PIN. You get a Registration Number instantly." },
   { icon: QrCode, title: "Pay ₹10 by UPI QR", text: "Scan with GPay, PhonePe, Paytm or any UPI app. Enter the 12-digit UPI reference — done." },
   { icon: Brain, title: "Practise for free", text: "Unlimited mock tests at your level, with instant scores and answer review." },
-  { icon: Hourglass, title: "Take the exam any day in December", text: "Pick a calm time between 1–31 Dec. One sitting, 8–12 minutes, on phone, tablet or laptop." },
+  {
+    icon: Hourglass,
+    title: "Take the exam any day in December",
+    text: `Pick a calm time between 1–31 Dec. One sitting of ${DURATION_MINUTES.min}–${DURATION_MINUTES.max} minutes, tapping answers on a phone, tablet or laptop.`,
+  },
   { icon: PartyPopper, title: "Winners on New Year's Day", text: "Results go live at midnight on 1 Jan 2027. Download your verified e-certificate." },
 ];
 
@@ -43,11 +47,15 @@ const FAIR = [
 const FAQ = [
   {
     q: "Who can participate?",
-    a: `Any child aged 4 to 18 (age as on 1 December 2026), from any abacus academy, school or home learner. No affiliation needed.`,
+    a: `Any child from Nursery to Class 12 (aged 4 to 18 on 1 December 2026), from any school, abacus academy or home learning. No affiliation needed.`,
   },
   {
-    q: "How do I choose the right level?",
-    a: "Pick the level that matches what your child has learnt so far — each level lists exactly what is asked. If unsure, take a free mock test at two levels and choose the one where they score 60–90%.",
+    q: "Which paper will my child get?",
+    a: "The paper for their school class in the current session. Every class from Nursery to Class 12 has its own paper and its own ranking — from 2-row single-digit sums in Nursery up to 5-digit sums, multiplication and division in Class 12. Try the exact format free in the mock tests.",
+  },
+  {
+    q: "Is the exam multiple choice?",
+    a: "Yes. Every question, including the Flash Round, shows four options — tap the right one. There is no negative marking, and ties are broken by the shorter time taken.",
   },
   {
     q: "Is a physical abacus allowed?",
@@ -87,10 +95,10 @@ export default function Home() {
           <div className="animate-fade-up">
             <div className="inline-flex flex-wrap items-center gap-2 rounded-full bg-white/[0.07] py-1.5 pl-1.5 pr-4 text-sm ring-1 ring-white/10">
               <span className="rounded-full bg-amber-400 px-2.5 py-0.5 text-xs font-bold text-ink">1–31 DEC 2026</span>
-              <span className="text-indigo-100/80">100% online · Ages 4–18</span>
+              <span className="text-indigo-100/80">100% online · Nursery to Class 12</span>
             </div>
             <h1 className="mt-6 font-display text-[2.6rem] font-extrabold leading-[1.02] tracking-tight text-balance sm:text-6xl lg:text-7xl">
-              The <span className="gold-text animate-shine">Abacus Stars</span> Championship 2026
+              <span className="gold-text animate-shine">{site.shortName}</span> {site.event}
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-indigo-100/80 sm:text-xl">
               A fair, timed online abacus exam for every child — taken from home, any day in December. Winners are crowned on{" "}
@@ -113,7 +121,7 @@ export default function Home() {
             {[
               { k: "₹10", v: "registration fee" },
               { k: "31 days", v: "to take the exam" },
-              { k: "7 levels", v: "× 6 age groups" },
+              { k: "15 classes", v: "Nursery to Class 12" },
               { k: "100%", v: "children get certificates" },
             ].map((s) => (
               <div key={s.k} className="px-2 py-2 text-center sm:px-6">
@@ -156,8 +164,8 @@ export default function Home() {
           <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
             <SectionTitle
               eyebrow="Exam format"
-              title="Seven levels, from first beads to Grand Master"
-              sub="Every paper has a written section and a Flash Round. Higher levels add multiplication and division. Answers are typed — no multiple-choice guessing."
+              title="A paper for every class, Nursery to Class 12"
+              sub="Every paper has abacus sums and a Flash Round; from Class 3 up, multiplication and division join in. Every question is multiple choice — four options, one correct — so even the youngest children can answer with a tap."
             />
             <Link href="/rules" className={cn(btn("outline"), "self-start lg:self-auto")}>
               Full rules & syllabus <ArrowRight className="h-4 w-4" />
@@ -165,10 +173,10 @@ export default function Home() {
           </div>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { icon: Lightbulb, t: "Add & Subtract", d: "Vertical sums, 3–6 rows, 1 to 4 digits." },
-              { icon: Medal, t: "Multiplication", d: "From 2×1 up to 3×2 digits (Level 3+)." },
-              { icon: Crown, t: "Division", d: "Exact division up to 4÷2 digits (Level 4+)." },
-              { icon: Zap, t: "Flash Round", d: "Numbers flash one at a time — add them up mentally." },
+              { icon: Lightbulb, t: "Add & Subtract", d: "Vertical sums, 2–6 rows, 1 to 5 digits." },
+              { icon: Medal, t: "Multiplication", d: "From 2×1 in Class 3 up to 4×3 digits in Class 12." },
+              { icon: Crown, t: "Division", d: "Exact division from Class 5, up to 6÷3 digits." },
+              { icon: Zap, t: "Flash Round", d: "Numbers flash one at a time — add them in your head." },
             ].map((x) => (
               <div key={x.t} className="rounded-3xl bg-white p-6 ring-1 ring-ink/8">
                 <x.icon className="h-6 w-6 text-amber-500" />
@@ -179,27 +187,22 @@ export default function Home() {
           </div>
           <Card className="mt-8 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[44rem] text-left text-sm">
+              <table className="w-full min-w-[36rem] text-left text-sm">
                 <thead className="bg-ink text-xs uppercase tracking-wider text-indigo-100/80">
                   <tr>
-                    <th className="px-5 py-4 font-semibold">Level</th>
+                    <th className="px-5 py-4 font-semibold">Class</th>
                     <th className="px-5 py-4 font-semibold">What&apos;s tested</th>
-                    <th className="px-5 py-4 font-semibold">Best for</th>
                     <th className="px-5 py-4 text-right font-semibold">Questions</th>
                     <th className="px-5 py-4 text-right font-semibold">Time</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink/8">
-                  {LEVELS.map((l) => (
-                    <tr key={l.id} className="hover:bg-indigo-50/40">
-                      <td className="px-5 py-4">
-                        <span className="font-display font-bold">{l.name}</span>
-                        <span className="ml-2 text-xs font-semibold text-ink/40">{l.id}</span>
-                      </td>
-                      <td className="px-5 py-4 text-ink/70">{l.description}</td>
-                      <td className="px-5 py-4 text-ink/60">{l.suitedFor}</td>
-                      <td className="px-5 py-4 text-right font-semibold tabular-nums">{totalQuestions(l)}</td>
-                      <td className="px-5 py-4 text-right font-semibold tabular-nums">{l.durationSec / 60} min</td>
+                  {GRADES.map((g) => (
+                    <tr key={g.id} className="hover:bg-indigo-50/40">
+                      <td className="whitespace-nowrap px-5 py-3.5 font-display font-bold">{g.label}</td>
+                      <td className="px-5 py-3.5 text-ink/70">{g.summary} + Flash Round</td>
+                      <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{totalQuestions(g.paper)}</td>
+                      <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{g.paper.durationSec / 60} min</td>
                     </tr>
                   ))}
                 </tbody>
@@ -213,25 +216,33 @@ export default function Home() {
       <section id="categories" className="container-x scroll-mt-20 py-24">
         <SectionTitle
           eyebrow="Categories"
-          title="Children compete only with their own age and level"
-          sub="Every age group × level is a separate category with its own Champion and Runners-up — so a 6-year-old is never ranked against a 14-year-old."
+          title="Children compete only with their own class"
+          sub="Every class is a separate category with its own Champion and Runners-up — so a UKG child is never ranked against a Class 5 child."
           center
         />
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {AGE_GROUPS.map((g, i) => (
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {STAGES.map((st, i) => (
             <div
-              key={g.id}
+              key={st.id}
               className="group relative overflow-hidden rounded-3xl bg-white p-7 ring-1 ring-ink/8 transition hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-900/10"
             >
               <div
                 className="absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-20 transition group-hover:scale-125"
-                style={{ background: ["#f59e0b", "#818cf8", "#f43f5e", "#34d399", "#38bdf8", "#a78bfa"][i] }}
+                style={{ background: ["#f59e0b", "#818cf8", "#f43f5e", "#34d399"][i] }}
               />
-              <p className="text-xs font-bold uppercase tracking-widest text-ink/40">Group {g.id}</p>
-              <p className="mt-2 font-display text-2xl font-bold">{g.label}</p>
-              <p className="mt-1 text-ink/60">
-                Ages {g.min}–{g.max}
-              </p>
+              <p className="text-xs font-bold uppercase tracking-widest text-ink/40">{st.short}</p>
+              <p className="mt-2 font-display text-2xl font-bold">{st.label}</p>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {GRADES.filter((g) => g.stage === st.id).map((g) => (
+                  <Link
+                    key={g.id}
+                    href={`/practice?class=${g.id}`}
+                    className="rounded-full bg-ink/5 px-2.5 py-1 text-xs font-semibold text-ink/70 transition hover:bg-indigo-600 hover:text-white"
+                  >
+                    {g.label}
+                  </Link>
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -362,6 +373,32 @@ export default function Home() {
             <Link href="/register" className={cn(btn("gold", "lg"), "mt-6 w-full")}>
               Register now
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* FOUNDERS */}
+      <section id="about" className="container-x scroll-mt-20 pb-24">
+        <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
+          <div>
+            <SectionTitle eyebrow="Who we are" title="Meet the founders" />
+            <p className="mt-4 max-w-xl text-lg leading-relaxed text-ink/65">
+              {site.shortName} was started by {site.founders[0].name} with co-founder {site.founders[1].name}, to give every child a fair, affordable
+              stage: a ₹10 entry, a paper for their own class, and a certificate for everyone who takes part.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {site.founders.map((f) => (
+              <div key={f.name} className="flex items-center gap-4 rounded-3xl bg-white p-6 ring-1 ring-ink/8">
+                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-ink font-display text-2xl font-bold text-amber-300" aria-hidden>
+                  {f.name[0]}
+                </span>
+                <div>
+                  <p className="font-display text-xl font-bold">{f.name}</p>
+                  <p className="text-sm font-semibold text-indigo-600">{f.role}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

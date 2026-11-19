@@ -2,18 +2,34 @@
  * Competition configuration — edit this file to rebrand or reschedule.
  * All dates are in IST (+05:30).
  */
+/** The platform brand, shared by every championship we run. */
+const brand = "Kudos Cup";
+/** This championship. Change these two lines for the next one. */
+const event = "Abacus Championship 2026";
+const eventShort = "Abacus 2026";
+
 export const site = {
-  name: "Abacus Stars Championship 2026",
-  shortName: "Abacus Stars",
-  organiser: "Abacus Stars Academy",
-  tagline: "India's ₹10 online abacus championship for ages 4–18",
-  regPrefix: "AS26",
-  certPrefix: "ASC26",
+  name: `${brand} ${event}`,
+  shortName: brand,
+  event,
+  eventShort,
+  /** Legal name on certificates and policies. Use your registered business name here if you have one. */
+  organiser: brand,
+  /** Shown on the home page, in the footer, in emails and as signatories on certificates. */
+  founders: [
+    { name: "Gagan", role: "Founder" },
+    { name: "Vansh", role: "Co-founder" },
+  ],
+  /** The brand domain. Emails are sent from it. */
+  domain: "kudoscup.com",
+  tagline: "India's ₹10 online abacus championship, Nursery to Class 12",
+  regPrefix: "KC26",
+  certPrefix: "KCC26",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   contact: {
-    phone: "+91 90000 00000",
-    whatsapp: "919000000000", // digits only, with country code
-    email: "hello@example.com",
+    phone: "+91 95696 08101",
+    whatsapp: "919569608101", // digits only, with country code
+    email: "hello@kudoscup.com",
     city: "Ludhiana, Punjab",
   },
 } as const;
@@ -34,22 +50,30 @@ export const fee = {
 
 /** Server-only payment details (read from env so they never ship in code). */
 export function upiDetails() {
+  const vpa = process.env.UPI_ID?.trim() ?? "";
   return {
-    vpa: process.env.UPI_ID ?? "yourname@upi",
+    vpa,
     payee: process.env.UPI_PAYEE_NAME ?? site.organiser,
+    /** False until a real UPI ID is configured, so nobody can pay a placeholder ID. */
+    ready: /^[\w.-]+@[\w.-]+$/.test(vpa) && !vpa.startsWith("yourname@"),
   };
+}
+
+/** Founders as "Gagan & Vansh". */
+export function foundersLine() {
+  return site.founders.map((f) => f.name).join(" & ");
 }
 
 export const prizes = [
   {
     id: "champion",
     title: "Champion",
-    detail: "Gold e-trophy certificate + Hall of Fame spot for #1 in every category",
+    detail: "Gold e-trophy certificate + Hall of Fame spot for #1 in every class",
   },
   {
     id: "runners",
     title: "1st & 2nd Runner-up",
-    detail: "Silver & Bronze certificates for #2 and #3 in every category",
+    detail: "Silver & Bronze certificates for #2 and #3 in every class",
   },
   {
     id: "distinction",
@@ -63,19 +87,9 @@ export const prizes = [
   },
 ] as const;
 
-export const AGE_GROUPS = [
-  { id: "A", label: "Little Champs", min: 4, max: 6 },
-  { id: "B", label: "Rising Stars", min: 7, max: 8 },
-  { id: "C", label: "Bright Sparks", min: 9, max: 10 },
-  { id: "D", label: "Quick Thinkers", min: 11, max: 12 },
-  { id: "E", label: "Mind Masters", min: 13, max: 14 },
-  { id: "F", label: "Grand Achievers", min: 15, max: 18 },
-] as const;
-
-export type AgeGroupId = (typeof AGE_GROUPS)[number]["id"];
-
-export const MIN_AGE = AGE_GROUPS[0].min;
-export const MAX_AGE = AGE_GROUPS[AGE_GROUPS.length - 1].max;
+/** Age limits on the reference date. Each class also has its own allowed age range (see exam/papers.ts). */
+export const MIN_AGE = 4;
+export const MAX_AGE = 18;
 
 export function ageOn(dob: string, ref: string = schedule.ageReferenceDate) {
   const [y, m, d] = dob.split("-").map(Number);
@@ -83,15 +97,6 @@ export function ageOn(dob: string, ref: string = schedule.ageReferenceDate) {
   let age = ry - y;
   if (rm < m || (rm === m && rd < d)) age--;
   return age;
-}
-
-export function ageGroupFor(dob: string) {
-  const age = ageOn(dob);
-  return AGE_GROUPS.find((g) => age >= g.min && age <= g.max) ?? null;
-}
-
-export function ageGroupById(id: string) {
-  return AGE_GROUPS.find((g) => g.id === id);
 }
 
 export const times = {

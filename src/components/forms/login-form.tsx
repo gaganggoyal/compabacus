@@ -1,6 +1,7 @@
 "use client";
 
 import { KeyRound, Search } from "lucide-react";
+import Link from "next/link";
 import { startTransition, useActionState, useRef, useState } from "react";
 import { type FormState, type LookupState, loginAction, lookupByPhoneAction } from "@/app/actions/student";
 import { WhatsAppIcon, whatsappLink } from "@/components/brand";
@@ -75,7 +76,7 @@ export function LoginForm() {
                       className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-ink/5"
                     >
                       <span>
-                        <b>{r.name}</b> · {r.level}
+                        <b>{r.name}</b> · {r.grade}
                       </span>
                       <span className="font-mono font-semibold text-indigo-700">{r.regNo}</span>
                     </button>
@@ -87,15 +88,19 @@ export function LoginForm() {
         )}
         <p className="mt-5 text-sm text-ink/55">
           Forgot your PIN?{" "}
+          <Link href="/forgot-pin" className="font-semibold text-indigo-600 hover:underline">
+            Reset it by email
+          </Link>
+          , or{" "}
           <a
             href={whatsappLink("Hi, I forgot my PIN for the abacus championship. My registration number is: ")}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline"
           >
-            <WhatsAppIcon className="h-4 w-4" /> Message us
-          </a>{" "}
-          and we&apos;ll reset it.
+            <WhatsAppIcon className="h-4 w-4" /> message us
+          </a>
+          .
         </p>
       </div>
     </div>

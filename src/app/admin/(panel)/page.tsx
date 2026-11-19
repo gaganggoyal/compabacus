@@ -5,9 +5,9 @@ import { requestNow } from "@/lib/now";
 import { Suspense } from "react";
 import { Card, PageLoading } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
-import { AGE_GROUPS, examTestMode, fee, phaseAt, upiDetails } from "@/lib/config";
+import { examTestMode, fee, phaseAt, upiDetails } from "@/lib/config";
 import { db, schema } from "@/lib/db";
-import { LEVELS } from "@/lib/exam/levels";
+import { GRADES } from "@/lib/exam/papers";
 import { finalizeExpiredAttempts } from "@/lib/exam/server";
 import { inr } from "@/lib/format";
 import { getResultsMode } from "@/lib/settings";
@@ -39,11 +39,12 @@ async function Overview() {
     .from(schema.attempts)
     .where(eq(schema.attempts.flagged, true));
 
-  const matrix = await db
-    .select({ g: schema.registrations.ageGroup, l: schema.registrations.level, n: count() })
+  const perGrade = await db
+    .select({ g: schema.registrations.grade, n: count() })
     .from(schema.registrations)
-    .groupBy(schema.registrations.ageGroup, schema.registrations.level);
-  const cell = (g: string, l: string) => matrix.find((m) => m.g === g && m.l === l)?.n ?? 0;
+    .groupBy(schema.registrations.grade);
+  const gradeCount = (id: string) => perGrade.find((m) => m.g === id)?.n ?? 0;
+  const maxGrade = Math.max(1, ...perGrade.map((m) => m.n));
 
   const daily = await db
     .select({
@@ -137,37 +138,22 @@ async function Overview() {
             <p className="mt-6 text-sm text-ink/50">No registrations yet.</p>
           )}
         </Card>
-        <Card className="overflow-x-auto p-6">
-          <p className="font-display text-lg font-bold">Registrations by category</p>
-          <table className="mt-4 w-full text-center text-sm tabular-nums">
-            <thead>
-              <tr className="text-xs text-ink/45">
-                <th className="py-2 text-left">Group</th>
-                {LEVELS.map((l) => (
-                  <th key={l.id} className="py-2" title={l.name}>
-                    {l.id}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {AGE_GROUPS.map((g) => (
-                <tr key={g.id} className="border-t border-ink/6">
-                  <td className="py-2 text-left font-semibold">
-                    {g.id} <span className="text-xs font-normal text-ink/45">{g.min}–{g.max}</span>
-                  </td>
-                  {LEVELS.map((l) => {
-                    const n = cell(g.id, l.id);
-                    return (
-                      <td key={l.id} className={n ? "font-semibold" : "text-ink/25"}>
-                        {n}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <Card className="p-6">
+          <p className="font-display text-lg font-bold">Registrations by class</p>
+          <ul className="mt-4 space-y-1.5 text-sm">
+            {GRADES.map((g) => {
+              const n = gradeCount(g.id);
+              return (
+                <li key={g.id} className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-3">
+                  <span className="font-semibold">{g.label}</span>
+                  <span className="h-2.5 overflow-hidden rounded-full bg-ink/5">
+                    <span className="block h-full rounded-full bg-indigo-500" style={{ width: `${(n / maxGrade) * 100}%` }} />
+                  </span>
+                  <span className={n ? "text-right font-semibold tabular-nums" : "text-right tabular-nums text-ink/30"}>{n}</span>
+                </li>
+              );
+            })}
+          </ul>
         </Card>
       </div>
     </div>

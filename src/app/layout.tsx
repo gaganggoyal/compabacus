@@ -18,12 +18,13 @@ const sans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
-    default: `${site.name} — Online Abacus Competition for Ages 4–18`,
+    default: `${site.name} · Online, Nursery to Class 12`,
     template: `%s · ${site.shortName}`,
   },
   description:
-    "Register for just ₹10. A fair, timed online abacus competition for children aged 4–18, open all of December. 7 levels, 6 age groups, verified e-certificates for every child, winners announced on 1 January.",
+    "Register for just ₹10. A fair, timed, multiple-choice online abacus competition for Nursery to Class 12, open all of December. A separate paper and ranking for every class, verified e-certificates for every child, winners announced on 1 January.",
   keywords: [
+    site.shortName,
     "abacus competition",
     "online abacus competition",
     "abacus olympiad",

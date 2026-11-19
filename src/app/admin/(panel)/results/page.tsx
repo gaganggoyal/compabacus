@@ -4,8 +4,8 @@ import { Suspense } from "react";
 import { ResultsControls } from "@/components/admin/admin-forms";
 import { Card, PageLoading } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
-import { AGE_GROUPS, times } from "@/lib/config";
-import { LEVELS } from "@/lib/exam/levels";
+import { times } from "@/lib/config";
+import { GRADES } from "@/lib/exam/papers";
 import { AWARD_META, fmtDateTime, fmtDuration } from "@/lib/format";
 import { rankedResults } from "@/lib/results";
 import { getResultsMode, getSetting } from "@/lib/settings";
@@ -51,18 +51,18 @@ async function AdminResults() {
         <ResultsControls mode={mode} />
       </Card>
 
-      {AGE_GROUPS.map((g) => {
-        const inGroup = rows.filter((r) => r.ageGroup === g.id);
-        if (!inGroup.length) return null;
+      {GRADES.map((g) => {
+        const inGrade = rows.filter((r) => r.grade === g.id);
+        if (!inGrade.length) return null;
         return (
           <Card key={g.id} className="overflow-x-auto p-6">
-            <p className="font-display text-lg font-bold">
-              Group {g.id} · {g.label} ({g.min}–{g.max})
-            </p>
-            <table className="mt-4 w-full min-w-[40rem] text-left text-sm">
+            <div className="flex items-baseline justify-between">
+              <p className="font-display text-lg font-bold">{g.label}</p>
+              <p className="text-sm text-ink/50">{inGrade.length} ranked · top 5 shown</p>
+            </div>
+            <table className="mt-4 w-full min-w-[36rem] text-left text-sm">
               <thead className="text-xs uppercase tracking-wider text-ink/45">
                 <tr>
-                  <th className="py-2">Level</th>
                   <th className="py-2">Rank</th>
                   <th className="py-2">Student</th>
                   <th className="py-2 text-right">Score</th>
@@ -71,12 +71,10 @@ async function AdminResults() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink/6">
-                {LEVELS.flatMap((l) =>
-                  inGroup
-                    .filter((r) => r.level === l.id && r.rank <= 5)
-                    .map((r) => (
+                {inGrade
+                  .filter((r) => r.rank <= 5)
+                  .map((r) => (
                       <tr key={r.attemptId}>
-                        <td className="py-2 text-xs">{l.id}</td>
                         <td className="py-2 font-bold">#{r.rank}</td>
                         <td className="py-2">
                           {r.studentName} <span className="text-xs text-ink/45">{r.city}</span>
@@ -89,8 +87,7 @@ async function AdminResults() {
                           {AWARD_META[r.award].emoji} {AWARD_META[r.award].label}
                         </td>
                       </tr>
-                    )),
-                )}
+                    ))}
               </tbody>
             </table>
           </Card>

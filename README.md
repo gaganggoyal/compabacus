@@ -1,23 +1,32 @@
-# Abacus Stars Championship 2026
+# Kudos Cup Abacus Championship 2026
 
-An online abacus competition site for children aged 4–18. Registration costs ₹10, paid by UPI QR. The exam window is open from 1 to 31 December 2026, and winners are announced automatically at midnight IST on 1 January 2027.
+An online abacus competition site for children from Nursery to Class 12 (ages 4–18). Registration costs ₹10, paid by UPI QR. The exam window is open from 1 to 31 December 2026, and winners are announced automatically at midnight IST on 1 January 2027.
+
+Kudos Cup is the brand for this and future championships, founded by Gagan (Founder) and Vansh (Co-founder). This championship runs at https://kudoscup.com.
 
 ## Features
 
 **For parents and students**
 - Landing page with a live countdown, the exam format, categories, awards, key dates and FAQ.
-- Registration in about 2 minutes. The age group is assigned automatically from the date of birth, and the parent picks a level and sets a 6-digit PIN.
+- Registration in about 2 minutes. The parent picks the child's class (Nursery to Class 12) and sets a 6-digit PIN. The form checks that the child's age fits the class, so nobody can take an easier paper.
 - Payment with a ₹10 UPI QR or a "pay with UPI app" button. The parent then enters the 12-digit UTR from their app.
 - A dashboard showing progress, payment status and exam status, plus an admit card and the result with a certificate download.
-- Unlimited free mock tests for all 7 levels, with instant scoring and answer review.
+- Unlimited free mock tests for every class, with instant scoring and an answer review showing the right option.
 - The timed exam:
-  - Every child gets a unique paper of the same difficulty.
+  - Every question is multiple choice: 4 options, one correct. The wrong options are realistic slips (a column off by 10 or 100, a forgotten row, a wrong sign), most share the answer's last digit, and the correct option's position is random, so guessing and elimination tricks don't help.
+  - Every child gets a unique paper of the same difficulty, with no repeated questions.
   - The clock runs on the server, and answers autosave every 8 seconds.
   - Students can resume after a disconnect, and the paper submits itself when time runs out.
   - Each Flash Round question can be played once.
   - Leaving the exam screen is counted. Three or more exits flag the attempt for review.
 - The results Hall of Fame, published automatically at New Year midnight.
-- PDF certificates with a QR code, and a public page to verify any certificate.
+- PDF certificates with a QR code, signed by the founders, and a public page to verify any certificate.
+- Emails to the parent:
+  - On registration, with the registration number and how to pay.
+  - When a payment is verified or rejected.
+  - When the exam is submitted.
+  - With the result and certificate link.
+- "Forgot PIN?" by email: a single-use link that works for 30 minutes.
 
 **For the organiser (`/admin`)**
 - An overview with stats, verified revenue, registrations per day and a breakdown by category.
@@ -27,27 +36,38 @@ An online abacus competition site for children aged 4–18. Registration costs �
   - Bulk verify: paste your bank statement and every matching UTR is approved.
 - Exam attempts: flagged list, disqualify or restore, and allow a retake.
 - Results: compute and preview, publish now, hide, or automatic reveal. Results export as CSV.
+- Emails: a log of every email with its delivery status, a "send test email" button, and one click to email results to every family.
 
 ## Competition format
 
-| Level | Content | Questions | Time |
-| --- | --- | --- | --- |
-| L0 Starter | 1-digit, 3 rows, addition (direct) + flash | 35 | 8 min |
-| L1 Beginner | 1-digit, 4 rows, ± direct + flash | 45 | 8 min |
-| L2 Junior | 1-digit, 5 rows, with formulas + flash | 45 | 10 min |
-| L3 Intermediate | 2-digit 4 rows, 2×1 multiplication + flash | 55 | 10 min |
-| L4 Advanced | 2-digit 5 rows, ×, ÷ by 1 digit + flash | 60 | 12 min |
-| L5 Expert | 3-digit 5 rows, 3×1/2×2, 3–4 ÷ 1 + flash | 60 | 12 min |
-| L6 Grand Master | 3–4 digit 6 rows, 3×2/4×1, 4÷2 + flash | 60 | 12 min |
+Each class has its own paper and its own ranking. Every paper ends with a Flash Round, where numbers flash one at a time and the child picks the total.
 
-Age groups are A 4–6, B 7–8, C 9–10, D 11–12, E 13–14 and F 15–18, by age on 1 December 2026. Each combination of age group and level is ranked separately.
+| Class | Paper | Questions | Time | Ages allowed |
+| --- | --- | --- | --- | --- |
+| Nursery | 1-digit addition, 2 rows + Flash Round | 25 | 6 min | 4–5 |
+| LKG | 1-digit addition, 3 rows + Flash Round | 30 | 7 min | 4–6 |
+| UKG | 1-digit add & subtract, 3 rows + Flash Round | 35 | 8 min | 4–7 |
+| Class 1 | 1-digit add & subtract, 4 rows + Flash Round | 35 | 8 min | 5–8 |
+| Class 2 | 1-digit add & subtract, 5 rows, with small & big friends + Flash Round | 40 | 10 min | 6–9 |
+| Class 3 | 2-digit sums (3 rows), 2×1 multiplication + Flash Round | 45 | 10 min | 7–10 |
+| Class 4 | 2-digit sums (4 rows), 2×1 & 3×1 multiplication + Flash Round | 45 | 10 min | 8–11 |
+| Class 5 | 2-digit sums (5 rows), multiplication, division by 1 digit + Flash Round | 55 | 12 min | 9–12 |
+| Class 6 | 3-digit sums (4 rows), 3×1 & 2×2, 3-digit ÷ 1-digit + Flash Round | 55 | 12 min | 10–13 |
+| Class 7 | 3-digit sums (5 rows), 2×2 & 3×2, division by 1 digit + Flash Round | 55 | 12 min | 11–14 |
+| Class 8 | 3–4 digit sums (5 rows), 3×2, division by 1–2 digits + Flash Round | 55 | 12 min | 12–15 |
+| Class 9 | 4-digit sums (5 rows), 3×2 & 4×2, 4-digit ÷ 2-digit + Flash Round | 55 | 12 min | 13–16 |
+| Class 10 | 4-digit sums (6 rows), 4×2, 4–5 digit ÷ 2-digit + Flash Round | 55 | 12 min | 14–17 |
+| Class 11 | 4–5 digit sums (6 rows), 4×2 & 3×3, 5-digit ÷ 2-digit + Flash Round | 55 | 12 min | 15–18 |
+| Class 12 | 5-digit sums (6 rows), 4×3, 5–6 digit ÷ 2–3 digit + Flash Round | 55 | 12 min | 16–18 |
 
-Students are ranked by score, then by shorter time taken, then by earlier submission. The awards are:
-- Champion, 1st Runner-up and 2nd Runner-up for ranks 1–3 in each category.
+"Ages allowed" is the age on 1 December 2026: the typical age for the class plus or minus a year.
+
+Students are ranked within their class by score, then by shorter time taken, then by earlier submission. There is no negative marking. The awards are:
+- Champion, 1st Runner-up and 2nd Runner-up for ranks 1–3 in each class.
 - Distinction for 90% or more, and Merit for 75% or more.
 - Participation for everyone else who completes the exam.
 
-Edit the levels in `src/lib/exam/levels.ts`. Edit the name, dates, contact details, age groups and prizes in `src/lib/config.ts`.
+Edit the class papers (rows, digits, question counts, timings, allowed ages) in `src/lib/exam/papers.ts`. Edit the brand and event name, dates, contact details and prizes in `src/lib/config.ts`.
 
 ## Run locally
 
@@ -62,27 +82,43 @@ The organiser panel is at `/admin` and uses the `ADMIN_PASSWORD` from `.env.loca
 
 ## Deploy
 
-The site needs a Node.js host and a database. Either option below works with no code changes.
+The live site runs on the VPS at 161.97.97.34, next to the other apps there.
 
-**Option A: Vercel + Turso (managed, free tiers)**
-1. Create a Turso database. Copy its `libsql://…` URL and an auth token.
-2. Run `DATABASE_URL=libsql://… DATABASE_AUTH_TOKEN=… npm run db:push` once.
-3. Import the GitHub repo into Vercel and set these environment variables: `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `SESSION_SECRET`, `ADMIN_PASSWORD`, `NEXT_PUBLIC_SITE_URL`, `UPI_ID`, `UPI_PAYEE_NAME` and `EXAM_TEST_MODE=false`.
-4. Add your domain.
+| | |
+| --- | --- |
+| Address | https://kudoscup.com (www redirects to it) |
+| App | `/var/www/kudoscup`, run by the `kudoscup` system user |
+| Service | `kudoscup.service` (systemd), port 3400. Logs: `journalctl -u kudoscup -f` |
+| Settings and secrets | `/var/www/kudoscup/.env.production.local` (chmod 600) |
+| Database | `/var/lib/kudoscup/abacus.db` (SQLite) |
+| Backups | daily at 03:30 to `/var/backups/kudoscup`, kept 14 days (`/etc/cron.d/kudoscup-backup`) |
+| HTTPS | the shared Caddy container. The block is in `deploy/Caddyfile.snippet`, appended to `/root/cricketverse_deploy/deployment/vps/Caddyfile` |
 
-**Option B: a single VPS**
-1. Run `npm ci && npm run build`.
-2. Set `DATABASE_URL=file:/var/data/abacus.db` and run `npm run db:push`.
-3. Start the site with `npm start` behind nginx or Caddy with HTTPS, and keep it running with pm2 or systemd.
-4. Back up the `.db` file daily.
+**To deploy an update:** run `./scripts/deploy.sh` from this folder. It uploads the code, then on the server installs packages, builds, adds any new database tables or columns, restarts the service and checks it came up. It refuses to apply a database change that would lose data.
+
+**Future championships:** give each one its own subdomain (for example `maths.kudoscup.com`), deployment and database. Keep this one at kudoscup.com, because its certificate QR codes point there.
+
+### Emails
+
+Emails go out through Resend, from `noreply@kudoscup.com`. Replies go to `hello@kudoscup.com`, an inbox in Resend (resend.com/inboxes).
+
+- Kudos Cup has its own Resend account on the Free plan: 100 emails a day and 3,000 a month. Results day needs one email per student. With more than about 100 students, click "Send result emails" once a day until none are waiting, or upgrade to Pro ($20) for that month.
+- The domain is in the Tokyo region (ap-northeast-1), with sending and receiving on. Its DNS records are at Nameslink.
+- The server uses a sending-only API key limited to kudoscup.com. It is `RESEND_API_KEY` in `.env.production.local` (after changing it, run `systemctl restart kudoscup`).
+
+Without a key, emails are recorded as "not sent" in `/admin/emails` and nothing else is affected. Optional settings: `EMAIL_FROM` and `EMAIL_REPLY_TO`.
 
 ## Go-live checklist (before 1 Dec)
 
-- [ ] Change the name, organiser, contact phone, WhatsApp and email in `src/lib/config.ts`.
-- [ ] Set `UPI_ID` and `UPI_PAYEE_NAME` to your real UPI account. A current account or UPI business account is best for exporting statements.
-- [ ] Set a strong `ADMIN_PASSWORD` and a fresh `SESSION_SECRET` (`openssl rand -hex 32`).
-- [ ] Set `NEXT_PUBLIC_SITE_URL` to the live domain. It's used in certificate QR codes.
-- [ ] Set **`EXAM_TEST_MODE=false`**.
+- [x] Domain kudoscup.com pointed at the VPS.
+- [x] Emails switched on (see "Emails" above). Send yourself a test from `/admin/emails` to see what parents get.
+- [x] `hello@kudoscup.com` is a Resend inbox (resend.com/inboxes). Parents' replies go there.
+- [x] Contact phone and WhatsApp: +91 95696 08101 (in `src/lib/config.ts`).
+- [ ] In `src/lib/config.ts`, confirm the city, and set `organiser` to your registered business name if you have one.
+- [x] `UPI_ID` is set to the Paytm UPI ID. The payment page shows "payments open soon" whenever no real UPI ID is set.
+- [x] `ADMIN_PASSWORD` and `SESSION_SECRET` are generated fresh on the server.
+- [x] `NEXT_PUBLIC_SITE_URL=https://kudoscup.com`. It's used in certificate QR codes, so don't change it after results are out.
+- [x] **`EXAM_TEST_MODE=false`** on the server.
 - [ ] Review the policy pages (`/terms`, `/privacy`, `/refund-policy`, `/rules`). They're templates.
 - [ ] Do a full test run: register, pay ₹10, take a mock test, then check `/admin`.
 
@@ -92,14 +128,18 @@ The site needs a Node.js host and a database. Either option below works with no 
 - **Throughout December:** check `/admin/attempts?filter=flagged` and disqualify only with good reason.
 - **By 31 Dec, 11:59 PM:** make sure every payment is verified. Only verified payments are ranked.
 - **1 Jan, 12:00 AM:** results compute and publish themselves. Nothing to do. Use `/admin/results` to preview them early or to hide them in an emergency.
+- **1 Jan, morning:** open `/admin/emails` and click **Email results to families**. It's safe to click again, because families already emailed are skipped.
 
 ## Tech stack
 
 Next.js 16 (App Router, Cache Components) · React 19 · Tailwind CSS 4 · Drizzle ORM + libSQL/SQLite · jose (sessions) · zod · qrcode · pdf-lib.
 
 Main files:
-- `src/lib/exam/generator.ts`: seeded question generator, including the abacus "direct move" rules for beginner levels.
+- `src/lib/exam/papers.ts`: the class-wise papers.
+- `src/lib/exam/generator.ts`: seeded question generator, including the abacus "direct move" rules for the youngest classes and the multiple-choice options.
 - `src/components/exam/exam-runner.tsx`: the exam and practice interface.
 - `src/app/actions/*`: server actions for registration, payment, exam and admin.
 - `src/lib/results.ts`: ranking and awards.
 - `src/lib/certificate.ts`: certificate PDF.
+- `src/lib/email/*`: email templates, sending (Resend, rate-limited, logged) and the triggers.
+- `deploy/` and `scripts/`: the systemd unit, the Caddy block, the deploy script and the nightly backup.

@@ -1,9 +1,10 @@
 "use client";
 
-import { Ban, Check, KeyRound, RotateCcw, Undo2, X } from "lucide-react";
+import { Ban, Check, KeyRound, Mail, RotateCcw, Send, Undo2, X } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import {
   type BulkState,
+  type EmailActionState,
   adminLoginAction,
   bulkVerifyAction,
   computeResultsAction,
@@ -13,6 +14,8 @@ import {
   resetAttemptAction,
   resetPinAction,
   restoreAttemptAction,
+  sendResultEmailsAction,
+  sendTestEmailAction,
   setResultsModeAction,
   verifyPaymentAction,
 } from "@/app/actions/admin";
@@ -160,6 +163,43 @@ export function AttemptActions({ id, status }: { id: string; status: string }) {
       >
         <RotateCcw className="h-3.5 w-3.5" /> Allow retake
       </button>
+    </div>
+  );
+}
+
+export function TestEmailForm() {
+  const [state, action, pending] = useActionState<EmailActionState, FormData>(sendTestEmailAction, {});
+  return (
+    <form action={action} className="mt-3 space-y-2">
+      <div className="flex gap-2">
+        <input name="to" type="email" placeholder="your@email.com" className={inputCls} required />
+        <button type="submit" disabled={pending} className={btn("dark")}>
+          <Mail className="h-4 w-4" /> {pending ? "Sending…" : "Send"}
+        </button>
+      </div>
+      {state.message && <p className={cn("text-sm", state.ok ? "text-emerald-700" : "text-rose-700")}>{state.message}</p>}
+    </form>
+  );
+}
+
+export function SendResultEmailsButton({ disabled, reason }: { disabled: boolean; reason?: string }) {
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<EmailActionState | null>(null);
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        disabled={disabled || pending}
+        onClick={() => {
+          if (!window.confirm("Email every ranked family their result and certificate link now?")) return;
+          start(async () => setMsg(await sendResultEmailsAction()));
+        }}
+        className={btn("primary", "sm")}
+      >
+        <Send className="h-4 w-4" /> {pending ? "Starting…" : "Email results to families"}
+      </button>
+      {reason && !msg && <p className="text-xs text-ink/50">{reason}</p>}
+      {msg?.message && <p className={cn("text-sm", msg.ok ? "text-emerald-700" : "text-rose-700")}>{msg.message}</p>}
     </div>
   );
 }

@@ -12,7 +12,14 @@ export function SiteFooter() {
           <p className="mt-4 max-w-xs text-sm leading-relaxed">
             A fair, affordable online abacus championship that helps every child show off their mental-maths superpower.
           </p>
-          <p className="mt-4 text-xs text-indigo-100/50">Organised by {site.organiser}</p>
+          <p className="mt-4 text-xs text-indigo-100/60">
+            Founded by {site.founders.map((f, i) => (
+              <span key={f.name}>
+                {i > 0 && " & "}
+                <span className="font-semibold text-indigo-100/85">{f.name}</span> ({f.role.toLowerCase()})
+              </span>
+            ))}
+          </p>
         </div>
         <div>
           <p className="text-sm font-bold text-white">Competition</p>

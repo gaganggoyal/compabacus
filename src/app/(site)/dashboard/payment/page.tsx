@@ -24,11 +24,14 @@ async function Payment({ searchParams }: { searchParams: PageProps<"/dashboard/p
   const reg = await currentStudent();
   if (!reg) redirect("/login?next=/dashboard/payment");
   const { welcome } = await searchParams;
-  const { vpa, payee } = upiDetails();
-  const upiUrl = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(payee)}&am=${fee.amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(
+  const { vpa, payee, ready } = upiDetails();
+  // Keep "@" unescaped in the UPI ID: some bank UPI apps reject "%40".
+  const upiUrl = `upi://pay?pa=${encodeURIComponent(vpa).replace(/%40/g, "@")}&pn=${encodeURIComponent(payee)}&am=${fee.amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(
     `${site.shortName} ${reg.regNo}`,
   )}`;
-  const qrSvg = await QRCode.toString(upiUrl, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#15123b", light: "#ffffff" } });
+  const qrSvg = ready
+    ? await QRCode.toString(upiUrl, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#15123b", light: "#ffffff" } })
+    : "";
 
   return (
     <div className="container-x py-10 sm:py-14">
@@ -64,6 +67,14 @@ async function Payment({ searchParams }: { searchParams: PageProps<"/dashboard/p
           <Link href="/dashboard" className={cn(btn("primary"), "mt-6")}>
             Go to dashboard
           </Link>
+        </Card>
+      ) : !ready ? (
+        <Card className="mt-8 max-w-xl p-8">
+          <p className="font-display text-2xl font-bold">Payments open soon</p>
+          <p className="mt-2 text-ink/65">
+            Your registration is saved. The ₹{fee.amount} UPI payment opens shortly. Please come back to this page, or log in later with{" "}
+            <b className="font-mono">{reg.regNo}</b> and your PIN.
+          </p>
         </Card>
       ) : (
         <div className="mt-8 grid gap-6 lg:grid-cols-2">

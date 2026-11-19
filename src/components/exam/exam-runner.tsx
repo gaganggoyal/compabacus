@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Flag, LayoutGrid, Play, Send, TriangleExclamationPoint, Wifi, Zap } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Flag, LayoutGrid, Play, Send, TriangleExclamationPoint, Wifi, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogoMark } from "@/components/brand";
 import { btn, cn } from "@/components/ui";
@@ -24,6 +24,10 @@ export type RunnerProps = {
 };
 
 type Item = { sectionIndex: number; q: ClientQuestion; n: number };
+
+const LETTERS = "ABCD";
+/** Pause after tapping an option before moving on, so the child sees their choice. */
+const ADVANCE_MS = 350;
 
 function readSet(key: string) {
   try {
@@ -49,9 +53,11 @@ export function ExamRunner(props: RunnerProps) {
   const [submitting, setSubmitting] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "offline">("saved");
+  // Flash questions already played (persisted, so a reload can't replay them) and ones whose numbers have finished.
   const [flashPlayed, setFlashPlayed] = useState<Set<string>>(() =>
     typeof window === "undefined" ? new Set() : readSet(`flash:${storageKey}`),
   );
+  const [flashDone, setFlashDone] = useState<Set<string>>(() => new Set(flashPlayed));
 
   // Difference between the server clock and this device's clock, measured on mount and on every save.
   const offset = useRef(0);
@@ -61,6 +67,7 @@ export function ExamRunner(props: RunnerProps) {
   const [now, setNow] = useState(() => props.serverNow);
   const dirty = useRef(false);
   const submitted = useRef(false);
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answersRef = useRef(answers);
   const lossesRef = useRef(focusLosses);
   useEffect(() => {
@@ -158,16 +165,34 @@ export function ExamRunner(props: RunnerProps) {
     return () => window.removeEventListener("beforeunload", onBefore);
   }, []);
 
-  const setAnswer = (id: string, v: string) => {
-    const clean = v.replace(/[^\d]/g, "").slice(0, 9);
-    setAnswers((a) => ({ ...a, [id]: clean }));
-    dirty.current = true;
-  };
+  useEffect(
+    () => () => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    },
+    [],
+  );
 
-  const go = (i: number) => {
-    setIdx(Math.max(0, Math.min(items.length - 1, i)));
-    setPaletteOpen(false);
-  };
+  const go = useCallback(
+    (i: number) => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+      setIdx(Math.max(0, Math.min(items.length - 1, i)));
+      setPaletteOpen(false);
+    },
+    [items.length],
+  );
+
+  const choose = useCallback(
+    (qid: string, option: number) => {
+      setAnswers((a) => ({ ...a, [qid]: String(option) }));
+      dirty.current = true;
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+      const from = items.findIndex((it) => it.q.id === qid);
+      if (from < items.length - 1) {
+        advanceTimer.current = setTimeout(() => setIdx((i) => (i === from ? from + 1 : i)), ADVANCE_MS);
+      }
+    },
+    [items],
+  );
 
   const markFlashPlayed = (id: string) => {
     setFlashPlayed((s) => {
@@ -179,6 +204,31 @@ export function ExamRunner(props: RunnerProps) {
       return n;
     });
   };
+
+  const markFlashDone = useCallback((id: string) => setFlashDone((s) => new Set(s).add(id)), []);
+
+  // Keyboard: 1–4 or A–D picks an option, arrows / Enter move between questions.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (confirm || submitting || warn || e.metaKey || e.ctrlKey || e.altKey) return;
+      const q = items[idx].q;
+      const key = e.key.toLowerCase();
+      const pick = "1234".includes(key) ? Number(key) - 1 : "abcd".includes(key) && key.length === 1 ? "abcd".indexOf(key) : -1;
+      if (pick >= 0) {
+        if (q.kind === "flash" && !flashDone.has(q.id)) return;
+        e.preventDefault();
+        choose(q.id, q.options[pick]);
+      } else if (e.key === "ArrowRight" || e.key === "Enter") {
+        e.preventDefault();
+        go(idx + 1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        go(idx - 1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [items, idx, confirm, submitting, warn, flashDone, choose, go]);
 
   const lowTime = remaining < 60_000;
 
@@ -255,10 +305,10 @@ export function ExamRunner(props: RunnerProps) {
               key={current.q.id}
               q={current.q}
               value={answers[current.q.id] ?? ""}
-              onChange={(v) => setAnswer(current.q.id, v)}
-              onEnter={() => go(idx + 1)}
+              onChoose={(o) => choose(current.q.id, o)}
               flashPlayed={flashPlayed.has(current.q.id)}
               onFlashPlayed={() => markFlashPlayed(current.q.id)}
+              onFlashDone={() => markFlashDone(current.q.id)}
             />
             <div className="mt-5 flex items-center justify-between gap-3">
               <button type="button" onClick={() => go(idx - 1)} disabled={idx === 0} className={btn("outline")}>
@@ -269,7 +319,7 @@ export function ExamRunner(props: RunnerProps) {
               </button>
               {idx < items.length - 1 ? (
                 <button type="button" onClick={() => go(idx + 1)} className={btn("dark")}>
-                  Next <ChevronRight className="h-4 w-4" />
+                  {answers[current.q.id] ? "Next" : "Skip"} <ChevronRight className="h-4 w-4" />
                 </button>
               ) : (
                 <button type="button" onClick={() => setConfirm(true)} className={btn("primary")}>
@@ -277,7 +327,10 @@ export function ExamRunner(props: RunnerProps) {
                 </button>
               )}
             </div>
-            <p className="mt-4 text-center text-xs text-ink/40">Press Enter to go to the next question</p>
+            <p className="mt-4 text-center text-xs text-ink/40">
+              Tap an answer to move on. You can come back and change it until you submit.
+              <span className="hidden sm:inline"> Keys 1–4 also work.</span>
+            </p>
           </div>
         </main>
 
@@ -373,61 +426,67 @@ export function ExamRunner(props: RunnerProps) {
 }
 
 function Num({ n }: { n: number }) {
-  return n < 0 ? (
-    <span className="text-rose-600">−{Math.abs(n)}</span>
-  ) : (
-    <span>{n}</span>
-  );
+  return n < 0 ? <span className="text-rose-600">−{Math.abs(n)}</span> : <span>{n}</span>;
 }
 
-function AnswerInput({ value, onChange, onEnter, autoFocus = true }: { value: string; onChange: (v: string) => void; onEnter: () => void; autoFocus?: boolean }) {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (autoFocus) ref.current?.focus({ preventScroll: true });
-  }, [autoFocus]);
+function OptionGrid({ options, value, onChoose }: { options: number[]; value: string; onChoose: (o: number) => void }) {
   return (
-    <input
-      ref={ref}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          onEnter();
-        }
-      }}
-      onPaste={(e) => e.preventDefault()}
-      inputMode="numeric"
-      autoComplete="off"
-      autoCorrect="off"
-      spellCheck={false}
-      placeholder="Answer"
-      aria-label="Your answer"
-      className="mt-5 block w-full rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 px-4 py-3 text-center font-display text-3xl font-bold tabular-nums text-ink placeholder:text-base placeholder:font-semibold placeholder:text-ink/30 focus:border-indigo-600 focus:bg-white focus:outline-none select-text"
-    />
+    <div className="mt-6 grid grid-cols-2 gap-3" role="radiogroup" aria-label="Answer options">
+      {options.map((o, i) => {
+        const selected = value === String(o);
+        const long = String(o).length >= 6;
+        return (
+          <button
+            key={o}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={`Option ${LETTERS[i]}: ${o}`}
+            onClick={() => onChoose(o)}
+            className={cn(
+              "relative rounded-2xl border-2 px-3 pb-3 pt-6 text-center transition active:scale-[0.97]",
+              selected
+                ? "border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                : "border-ink/10 bg-white text-ink hover:border-indigo-300 hover:bg-indigo-50/60",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute left-2 top-2 grid h-5 min-w-5 place-items-center rounded-md px-1 text-[11px] font-bold",
+                selected ? "bg-white/20 text-white" : "bg-ink/5 text-ink/50",
+              )}
+            >
+              {LETTERS[i]}
+            </span>
+            {selected && <Check className="absolute right-2 top-2 h-4 w-4" />}
+            <span className={cn("block font-display font-bold tabular-nums", long ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl")}>{o}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
 function QuestionCard({
   q,
   value,
-  onChange,
-  onEnter,
+  onChoose,
   flashPlayed,
   onFlashPlayed,
+  onFlashDone,
 }: {
   q: ClientQuestion;
   value: string;
-  onChange: (v: string) => void;
-  onEnter: () => void;
+  onChoose: (o: number) => void;
   flashPlayed: boolean;
   onFlashPlayed: () => void;
+  onFlashDone: () => void;
 }) {
   if (q.kind === "flash") {
-    return <FlashCard q={q} value={value} onChange={onChange} onEnter={onEnter} played={flashPlayed} onPlayed={onFlashPlayed} />;
+    return <FlashCard q={q} value={value} onChoose={onChoose} played={flashPlayed} onPlayed={onFlashPlayed} onDone={onFlashDone} />;
   }
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-[0_20px_60px_-30px_rgba(21,18,59,0.35)] ring-1 ring-ink/8 sm:p-8">
+    <div className="rounded-3xl bg-white p-5 shadow-[0_20px_60px_-30px_rgba(21,18,59,0.35)] ring-1 ring-ink/8 sm:p-8">
       {q.kind === "addsub" ? (
         <div className="mx-auto w-fit min-w-[8rem] text-right font-display text-4xl font-bold leading-[1.25] tabular-nums sm:text-5xl">
           {q.rows.map((r, i) => (
@@ -442,7 +501,7 @@ function QuestionCard({
           {q.a} <span className="text-indigo-600">{q.kind === "mul" ? "×" : "÷"}</span> {q.b} <span className="text-ink/30">=</span>
         </div>
       )}
-      <AnswerInput value={value} onChange={onChange} onEnter={onEnter} />
+      <OptionGrid options={q.options} value={value} onChoose={onChoose} />
     </div>
   );
 }
@@ -450,21 +509,26 @@ function QuestionCard({
 function FlashCard({
   q,
   value,
-  onChange,
-  onEnter,
+  onChoose,
   played,
   onPlayed,
+  onDone,
 }: {
   q: Extract<ClientQuestion, { kind: "flash" }>;
   value: string;
-  onChange: (v: string) => void;
-  onEnter: () => void;
+  onChoose: (o: number) => void;
   played: boolean;
   onPlayed: () => void;
+  onDone: () => void;
 }) {
   const [stage, setStage] = useState<"idle" | "countdown" | "playing" | "done">(played ? "done" : "idle");
   const [step, setStep] = useState(0);
   const [count, setCount] = useState(3);
+  // The parent re-renders 4×/s for the clock; keep the callback in a ref so the flash timer isn't reset each time.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
 
   useEffect(() => {
     if (stage === "countdown") {
@@ -478,22 +542,24 @@ function FlashCard({
     }
     if (stage === "playing") {
       const t = setTimeout(() => {
-        if (step + 1 >= q.rows.length) setStage("done");
-        else setStep((s) => s + 1);
+        if (step + 1 >= q.rows.length) {
+          setStage("done");
+          onDoneRef.current();
+        } else setStep((s) => s + 1);
       }, q.intervalMs);
       return () => clearTimeout(t);
     }
   }, [stage, step, count, q.rows.length, q.intervalMs]);
 
   return (
-    <div className="overflow-hidden rounded-3xl bg-ink p-6 text-white shadow-2xl ring-1 ring-white/10 sm:p-8">
+    <div className="overflow-hidden rounded-3xl bg-ink p-5 text-white shadow-2xl ring-1 ring-white/10 sm:p-8">
       <div className="grid min-h-[11rem] place-items-center">
         {stage === "idle" && (
           <div className="text-center">
             <Zap className="mx-auto h-8 w-8 text-amber-300" />
             <p className="mt-3 font-display text-xl font-bold">Flash round</p>
             <p className="mt-1 text-sm text-indigo-100/70">
-              {q.rows.length} numbers will flash, one every {(q.intervalMs / 1000).toFixed(1)}s. Add them in your head.
+              {q.rows.length} numbers will flash, one every {(q.intervalMs / 1000).toFixed(1)}s. Add them in your head, then pick the total.
               <br />
               <b className="text-amber-200">You can play it only once.</b>
             </p>
@@ -530,11 +596,7 @@ function FlashCard({
           </div>
         )}
       </div>
-      {stage === "done" && (
-        <div className="rounded-2xl bg-white p-1 text-ink">
-          <AnswerInput value={value} onChange={onChange} onEnter={onEnter} />
-        </div>
-      )}
+      {stage === "done" && <OptionGrid options={q.options} value={value} onChoose={onChoose} />}
     </div>
   );
 }

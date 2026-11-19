@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { requestNow } from "@/lib/now";
 import { Suspense } from "react";
 import { Card, Eyebrow, btn, cn, inputCls } from "@/components/ui";
-import { ageGroupById } from "@/lib/config";
-import { levelById } from "@/lib/exam/levels";
+import { site } from "@/lib/config";
+import { gradeLabel } from "@/lib/exam/papers";
 import { AWARD_META } from "@/lib/format";
 import { certificateByNo, resultsLive } from "@/lib/results";
 
@@ -30,7 +30,7 @@ export default function VerifyPage({ searchParams }: PageProps<"/verify">) {
 function VerifyForm({ value }: { value?: string }) {
   return (
     <form action="/verify" className="mt-8 flex gap-2">
-      <input name="cert" defaultValue={value} placeholder="e.g. ASC26-7KQ2M9P" className={cn(inputCls, "font-mono uppercase")} required />
+      <input name="cert" defaultValue={value} placeholder={`e.g. ${site.certPrefix}-7KQ2M9P`} className={cn(inputCls, "font-mono uppercase")} required />
       <button type="submit" className={btn("primary")}>
         <Search className="h-4 w-4" /> Verify
       </button>
@@ -62,7 +62,7 @@ async function VerifyResult({ searchParams }: { searchParams: PageProps<"/verify
               {AWARD_META[c.award].emoji} {AWARD_META[c.award].label}
             </p>
             <p className="mt-4 text-sm text-ink/60">
-              Group {c.ageGroup} ({ageGroupById(c.ageGroup)?.label}) · {levelById(c.level)?.name} · Score {c.score}/{c.maxScore}
+              {gradeLabel(c.grade)} · Score {c.score}/{c.maxScore}
               {c.rank ? ` · Rank ${c.rank}` : ""}
             </p>
             <p className="mt-2 font-mono text-xs text-ink/40">{c.certNo}</p>

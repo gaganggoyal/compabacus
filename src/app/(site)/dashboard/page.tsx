@@ -25,9 +25,9 @@ import { CopyButton } from "@/components/copy-button";
 import { Countdown } from "@/components/countdown";
 import { Badge, Card, PageLoading, btn, cn } from "@/components/ui";
 import { currentStudent } from "@/lib/auth";
-import { ageGroupById, times } from "@/lib/config";
+import { times } from "@/lib/config";
 import type { Attempt, Registration } from "@/lib/db/schema";
-import { levelById } from "@/lib/exam/levels";
+import { gradeById, totalQuestions } from "@/lib/exam/papers";
 import { AWARD_META, fmtDate, fmtDateTime, fmtDuration } from "@/lib/format";
 import { resultsLive } from "@/lib/results";
 import { examGate, freshAttempt } from "@/lib/student-view";
@@ -49,8 +49,7 @@ async function Dashboard() {
   const attempt = await freshAttempt(reg, now);
   const live = await resultsLive(now);
   const gate = examGate(reg, attempt, now);
-  const level = levelById(reg.level);
-  const group = ageGroupById(reg.ageGroup);
+  const grade = gradeById(reg.grade);
 
   const steps = [
     { label: "Registered", done: true },
@@ -71,12 +70,7 @@ async function Dashboard() {
               {reg.regNo}
               <CopyButton value={reg.regNo} label="Copy" className="text-white hover:bg-white/10" />
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              Group {group?.id} · {group?.label}
-            </span>
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {level?.name} ({reg.level})
-            </span>
+            <span className="rounded-full bg-white/10 px-3 py-1">{grade?.label ?? reg.grade} paper</span>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -118,9 +112,9 @@ async function Dashboard() {
             <Brain className="h-7 w-7 text-indigo-600" />
             <p className="mt-4 font-display text-xl font-bold">Free mock tests</p>
             <p className="mt-1 text-sm text-ink/60">
-              Practise the {level?.name} paper as many times as you like. Fresh numbers every time.
+              Practise the {grade?.label} paper as many times as you like. A fresh paper every time.
             </p>
-            <Link href="/practice" className={cn(btn("outline"), "mt-5")}>
+            <Link href={`/practice?class=${reg.grade}`} className={cn(btn("outline"), "mt-5")}>
               Start practising <ArrowRight className="h-4 w-4" />
             </Link>
           </Card>
@@ -191,14 +185,15 @@ function PaymentCard({ reg }: { reg: Registration }) {
 }
 
 function ExamCard({ reg, attempt, gate, live }: { reg: Registration; attempt: Attempt | undefined; gate: string; live: boolean }) {
-  const level = levelById(reg.level);
+  const grade = gradeById(reg.grade);
+  const minutes = grade ? grade.paper.durationSec / 60 : 10;
   return (
     <Card className="relative overflow-hidden p-6 sm:p-8">
       <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-indigo-100/60" />
       <div className="relative">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Championship exam</p>
         <p className="mt-2 font-display text-2xl font-bold">
-          {level?.name} paper · {level ? level.durationSec / 60 : "?"} minutes
+          {grade?.label} paper · {grade ? totalQuestions(grade.paper) : "?"} questions · {minutes} minutes
         </p>
 
         {gate === "pay" && (
@@ -221,7 +216,7 @@ function ExamCard({ reg, attempt, gate, live }: { reg: Registration; attempt: At
         {gate === "open" && (
           <>
             <p className="mt-2 text-ink/60">
-              The exam is open! Find a quiet place, keep your abacus ready, and make sure you have {level ? level.durationSec / 60 + 5 : 15} free
+              The exam is open! Find a quiet place, keep your abacus ready, and make sure you have {minutes + 5} free
               minutes. Exam closes {fmtDateTime(times.examEnd)}.
             </p>
             <Link href="/exam" className={cn(btn("primary", "lg"), "mt-6")}>

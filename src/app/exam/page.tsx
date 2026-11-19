@@ -8,9 +8,9 @@ import { Logo } from "@/components/brand";
 import { LiveExam, StartExamButton } from "@/components/exam/exam-client";
 import { Card, btn, cn } from "@/components/ui";
 import { currentStudent } from "@/lib/auth";
-import { ageGroupById, times } from "@/lib/config";
+import { times } from "@/lib/config";
 import { toClientPaper } from "@/lib/exam/generator";
-import { levelById, totalQuestions } from "@/lib/exam/levels";
+import { gradeById, totalQuestions } from "@/lib/exam/papers";
 import { parseAnswers, parsePaper } from "@/lib/exam/server";
 import { fmtDateTime, fmtDuration } from "@/lib/format";
 import { examGate, freshAttempt } from "@/lib/student-view";
@@ -53,16 +53,16 @@ async function ExamGate() {
   if (!reg) redirect("/login?next=/exam");
   const attempt = await freshAttempt(reg, now);
   const gate = examGate(reg, attempt, now);
-  const level = levelById(reg.level)!;
-  const group = ageGroupById(reg.ageGroup);
+  const grade = gradeById(reg.grade)!;
+  const paper = grade.paper;
 
   if (gate.kind === "in_progress" && attempt) {
     return (
       <LiveExam
         attemptId={attempt.id}
         paper={toClientPaper(parsePaper(attempt))}
-        title={`${reg.studentName} · ${level.name}`}
-        subtitle={`${reg.regNo} · Group ${reg.ageGroup}`}
+        title={`${reg.studentName} · ${grade.label}`}
+        subtitle={`${reg.regNo} · ${grade.label} paper`}
         deadline={attempt.deadlineAt.getTime()}
         serverNow={now}
         initialAnswers={parseAnswers(attempt)}
@@ -128,14 +128,14 @@ async function ExamGate() {
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Championship exam</p>
       <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight">Ready, {reg.studentName.split(" ")[0]}?</h1>
       <p className="mt-2 text-ink/60">
-        {level.name} paper · Group {group?.id} ({group?.label})
+        {grade.label} paper · {grade.summary}
       </p>
 
       <div className="mt-6 grid grid-cols-3 gap-3">
         {[
-          { icon: Clock, k: `${level.durationSec / 60} min`, v: "time limit" },
-          { icon: CalendarClock, k: totalQuestions(level), v: "questions" },
-          { icon: Zap, k: level.sections.length, v: "sections" },
+          { icon: Clock, k: `${paper.durationSec / 60} min`, v: "time limit" },
+          { icon: CalendarClock, k: totalQuestions(paper), v: "questions" },
+          { icon: Zap, k: paper.sections.length, v: "sections" },
         ].map((x) => (
           <div key={x.v} className="rounded-2xl bg-white p-4 text-center ring-1 ring-ink/8">
             <x.icon className="mx-auto h-5 w-5 text-indigo-600" />
@@ -148,7 +148,7 @@ async function ExamGate() {
       <Card className="mt-6 p-6">
         <p className="font-display text-lg font-bold">Paper</p>
         <ul className="mt-3 divide-y divide-ink/8 text-sm">
-          {level.sections.map((s) => (
+          {paper.sections.map((s) => (
             <li key={s.id} className="flex items-center justify-between py-2.5">
               <span className="font-medium">{s.title}</span>
               <span className="text-ink/55">{s.count} questions</span>
@@ -170,7 +170,8 @@ async function ExamGate() {
           </li>
           <li className="flex gap-3">
             <Zap className="h-5 w-5 shrink-0 text-indigo-600" />
-            Each Flash Round question can be played only once. Answer the total after the numbers finish.
+            Every question has four options — tap the right one. Each Flash Round question can be played only once; pick the total after the
+            numbers finish.
           </li>
           <li className="flex gap-3">
             <Wifi className="h-5 w-5 shrink-0 text-indigo-600" />

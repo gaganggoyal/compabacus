@@ -5,11 +5,12 @@ export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 40 40" className={cn("h-9 w-9", className)} aria-hidden>
       <rect x="1" y="1" width="38" height="38" rx="11" fill="#15123b" />
-      <path d="M8 13h24M8 20h24M8 27h24" stroke="#ffffff" strokeOpacity=".25" strokeWidth="1.6" strokeLinecap="round" />
-      <ellipse cx="14" cy="13" rx="4.2" ry="3.2" fill="#f59e0b" />
-      <ellipse cx="24" cy="20" rx="4.2" ry="3.2" fill="#818cf8" />
-      <ellipse cx="17" cy="27" rx="4.2" ry="3.2" fill="#f43f5e" />
-      <path d="M31 6.5l1.1 2.3 2.4.3-1.8 1.7.5 2.4-2.2-1.2-2.2 1.2.5-2.4-1.8-1.7 2.4-.3z" fill="#fde68a" />
+      <path d="M13 12.5h-2.6a3 3 0 0 0 0 6h3.2M27 12.5h2.6a3 3 0 0 1 0 6h-3.2" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12.5 10h15v6.5a7.5 7.5 0 0 1-15 0z" fill="#f59e0b" />
+      <path d="M18.5 23.5h3V27h-3z" fill="#f59e0b" />
+      <rect x="14.5" y="27" width="11" height="3.2" rx="1.2" fill="#fbbf24" />
+      <path d="M15.6 12.6v3.6" stroke="#fde68a" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M31.5 3.6l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z" fill="#fde68a" />
     </svg>
   );
 }
@@ -23,7 +24,7 @@ export function Logo({ dark, className }: { dark?: boolean; className?: string }
           {site.shortName}
         </span>
         <span className={cn("block whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.2em]", dark ? "text-amber-300" : "text-indigo-600")}>
-          Championship 2026
+          {site.eventShort}
         </span>
       </span>
     </span>

@@ -1,0 +1,20 @@
+# ---------------------------------------------------------------------------
+# Kudos Cup Abacus Championship (kudoscup.com). Next.js on the host at :3400,
+# systemd kudoscup.service, files in /var/www/kudoscup, SQLite database in
+# /var/lib/kudoscup. Future championships get their own subdomain
+# (maths.kudoscup.com …) and their own block.
+www.kudoscup.com {
+	redir https://kudoscup.com{uri} permanent
+}
+
+kudoscup.com {
+	encode zstd gzip
+	reverse_proxy 172.18.0.1:3400
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

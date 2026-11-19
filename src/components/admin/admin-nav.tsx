@@ -1,6 +1,6 @@
 "use client";
 
-import { Gauge, ListChecks, LogOut, Trophy, Users, Wallet } from "lucide-react";
+import { Gauge, ListChecks, LogOut, Mail, Trophy, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { adminLogoutAction } from "@/app/actions/admin";
@@ -13,6 +13,7 @@ const NAV = [
   { href: "/admin/payments", label: "Payments", icon: Wallet },
   { href: "/admin/attempts", label: "Exam attempts", icon: ListChecks },
   { href: "/admin/results", label: "Results", icon: Trophy },
+  { href: "/admin/emails", label: "Emails", icon: Mail },
 ];
 
 export function AdminNav() {
